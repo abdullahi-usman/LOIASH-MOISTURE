@@ -717,7 +717,7 @@ fun JobView(job: Job, onContinueJobClicked: (job: Job) -> Unit) {
                 Text(text = "Third  Weight: ${job.w3}", fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Result: ${job.w3}",
+                    text = "Result: ${job.calculate()}",
                     fontSize = 16.sp,
                     color = MaterialTheme.colors.primaryVariant
                 )
