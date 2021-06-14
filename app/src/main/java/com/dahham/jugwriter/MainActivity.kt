@@ -355,6 +355,12 @@ fun Content(
     onSaveJob: ((job: Job) -> Unit)? = null, job: Job
 ) {
 
+    /*
+    * TODO: This is ugly, so so ugly, make sure you refactor!!!
+    *  find better way and get rid of w1, w2, w3 and saveableJob
+    * TODO: And also this compose function is so big and confusing
+    *
+    * */
     val saveableJob by remember(key1 = job) {
         mutableStateOf(job.copy())
     }
