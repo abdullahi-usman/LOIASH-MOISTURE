@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf(allPermissionGranted())
             }
 
-            var job by remember {
+            val job = remember {
                 mutableStateOf(Job())
             }
 
@@ -158,7 +158,7 @@ class MainActivity : ComponentActivity() {
                                     bottomSheetScaffoldState.bottomSheetState.collapse()
                                 }
 
-                                job = it
+                                job.value = it
                             }
                         }
                     },
@@ -211,20 +211,19 @@ class MainActivity : ComponentActivity() {
                         }
                         else -> null
                     }, onSaveJob = { _job ->
-                        job = Job()
                         scope.launch {
                             var id: Long
                             withContext(Dispatchers.IO) {
                                 id = databaseDao.Insert(_job)
                             }
                             if (id != 0L) {
-                                job = Job()
+                                job.value = Job()
                                 bottomSheetScaffoldState.snackbarHostState.showSnackbar("Job saved successfully")
                             }else {
                                 bottomSheetScaffoldState.snackbarHostState.showSnackbar("Job not saved")
                             }
                         }
-                    }, job = job)
+                    }, job = job.value)
                 }
             }
         }
@@ -356,23 +355,30 @@ fun Content(
     onSaveJob: ((job: Job) -> Unit)? = null, job: Job
 ) {
 
+    val saveableJob by remember(key1 = job) {
+        mutableStateOf(job.copy())
+    }
 
     val w1 = rememberSaveable(inputs = arrayOf(job.w1)) {
         mutableStateOf(job.w1.toEngineeringString())
     }
-    var w2 = rememberSaveable(inputs = arrayOf(job.w2)) {
+    val w2 = rememberSaveable(inputs = arrayOf(job.w2)) {
         mutableStateOf(job.w2.toEngineeringString())
     }
-    var w3 = rememberSaveable(inputs = arrayOf(job.w3)) {
+    val w3 = rememberSaveable(inputs = arrayOf(job.w3)) {
         mutableStateOf(job.w3.toEngineeringString())
     }
 
-    val answer = rememberSaveable(inputs = arrayOf(w1, w2, w3)) {
-        job.w1 = w1.value.toBigDecimal()
-        job.w2 = w2.value.toBigDecimal()
-        job.w3 = w3.value.toBigDecimal()
+    val answer = rememberSaveable(inputs = arrayOf(w1.value, w2.value, w3.value, saveableJob.lastJobOperator)) {
+        saveableJob.w1 = w1.value.toBigDecimal()
+        saveableJob.w2 = w2.value.toBigDecimal()
+        saveableJob.w3 = w3.value.toBigDecimal()
 
-        mutableStateOf(job.calculate())
+        return@rememberSaveable try {
+            mutableStateOf(saveableJob.calculate())
+        }catch (ex: ArithmeticException){
+            mutableStateOf(BigDecimal(0))
+        }
     }
 
     var currentCameraPosition = w1
@@ -420,7 +426,7 @@ fun Content(
                 Job.JobOperator.values().forEach {
                     DropdownMenuItem(onClick = {
                         jobAnalysisToggle.value = jobAnalysisToggle.value.not()
-                        job.lastJobOperator = it
+                        saveableJob.lastJobOperator = it
                     }) {
                         Text(text = it.name)
                     }
@@ -429,7 +435,7 @@ fun Content(
             }
 
             Button(onClick = {
-                onSaveJob?.invoke(job)
+                onSaveJob?.invoke(saveableJob)
             }) {
                 Text(text = "Save Job")
             }
@@ -471,7 +477,7 @@ fun Content(
                     }else if(it.endsWith('.')){
                         w1.value = it.replace(".", "").plus('.')
                     }else {
-                        w1.value = it.trim { (it != '.' && it.isDigit().not()) || it.isDigit().not() }.toBigDecimal().toEngineeringString()
+                        w1.value = it.filter {  (it == '.' || it.isDigit()) }.trim().toBigDecimal().toEngineeringString()
                     }
                 },
                 label = { Text(text = "First Weight(W1)") },
@@ -508,7 +514,7 @@ fun Content(
                     } else if(it.endsWith('.')){
                         w2.value = it.replace(".", "").plus('.')
                     }else {
-                        w2.value =  it.trim { (it != '.' && it.isDigit().not()) || it.isDigit().not() }.toBigDecimal().toEngineeringString()
+                        w2.value =  it.filter {  (it == '.' || it.isDigit()) }.trim().toBigDecimal().toEngineeringString()
                     }
                 },
                 label = { Text(text = "Second Weight(W2)") },
@@ -545,7 +551,7 @@ fun Content(
                     } else if(it.endsWith('.')){
                         w3.value = it.replace(".", "").plus('.')
                     }else {
-                        w3.value = it.trim { (it != '.' && it.isDigit().not()) || it.isDigit().not() }.toBigDecimal().toEngineeringString()
+                        w3.value = it.filter {  (it == '.' || it.isDigit()) }.trim().toBigDecimal().toEngineeringString()
                     }
                 },
                 label = { Text(text = "Third Weight(W3)") },
@@ -656,7 +662,7 @@ fun RecentJobsView( paddingValues: PaddingValues, all: List<Job>?, onContinueJob
     } else {
         LazyColumn(contentPadding = paddingValues) {
 
-            itemsIndexed(items = all, key =  {index, item -> return@itemsIndexed item.w1.toString() + item.w2.toString() + item.w3.toString() }) { index, job ->
+            itemsIndexed(items = all, key =  {index, item -> return@itemsIndexed item.uid.toString() + item.w1.toString() + item.w2.toString() + item.w3.toString() }) { index, job ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -752,30 +758,29 @@ data class Job(
     var lastJobOperator: JobOperator = JobOperator.LOI
 ) {
 
-
     enum class JobOperator {
 
         LOI {
-            override fun calculate(): BigDecimal {
-                return BigDecimal(0)
+            override fun calculate(job: Job): BigDecimal {
+                return ((job.w2 - job.w3) / (job.w2 - job.w1)) * BigDecimal(100)
             }
         },
         ASH {
-            override fun calculate(): BigDecimal {
-                return BigDecimal(0)
+            override fun calculate(job: Job): BigDecimal {
+                return BigDecimal(100) - LOI.calculate(job)
             }
         },
         MOISTURE {
-            override fun calculate(): BigDecimal {
-                return BigDecimal(0)
+            override fun calculate(job: Job): BigDecimal {
+                return LOI.calculate(job)
             }
         };
 
-        abstract fun calculate(): BigDecimal
+        abstract fun calculate(job: Job): BigDecimal
     }
 
     fun calculate(): BigDecimal {
-        return lastJobOperator.calculate()
+        return lastJobOperator.calculate(job = this)
     }
 
 }
@@ -788,7 +793,7 @@ interface JobDao {
     @Query("SELECT * FROM jobs WHERE uid == :id")
     fun getJobById(id: Long): Job
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = REPLACE)
     fun Insert(job: Job): Long
 
     @Delete
