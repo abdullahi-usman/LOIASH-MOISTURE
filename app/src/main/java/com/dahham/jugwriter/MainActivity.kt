@@ -417,7 +417,7 @@ fun Content(
 
             OutlinedButton(onClick = { jobAnalysisToggle.value = jobAnalysisToggle.value.not() }) {
                 Row(modifier = Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = job.lastJobOperator.name)
+                    Text(text = saveableJob.lastJobOperator.name)
                     Spacer(modifier = Modifier.width(6.dp))
                     Icon(
                         painter = painterResource(id = R.drawable.ic_baseline_expand_more_24),
