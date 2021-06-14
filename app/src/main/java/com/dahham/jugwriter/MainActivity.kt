@@ -359,13 +359,13 @@ fun Content(
         mutableStateOf(job.copy())
     }
 
-    val w1 = rememberSaveable(inputs = arrayOf(job.w1)) {
+    val w1 = rememberSaveable(inputs = arrayOf(job)) {
         mutableStateOf(job.w1.toEngineeringString())
     }
-    val w2 = rememberSaveable(inputs = arrayOf(job.w2)) {
+    val w2 = rememberSaveable(inputs = arrayOf(job)) {
         mutableStateOf(job.w2.toEngineeringString())
     }
-    val w3 = rememberSaveable(inputs = arrayOf(job.w3)) {
+    val w3 = rememberSaveable(inputs = arrayOf(job)) {
         mutableStateOf(job.w3.toEngineeringString())
     }
 
