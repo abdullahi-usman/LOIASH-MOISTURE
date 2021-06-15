@@ -251,12 +251,6 @@ class MainActivity : ComponentActivity() {
                             ).addOnCompleteListener {
                                 if (it.isSuccessful) {
                                     var text = it.result.text
-                                    //Toast.makeText(
-                                    //    this,
-                                    //    "text processed: $text",
-                                    //    Toast.LENGTH_LONG
-                                    //)
-                                    //    .show()
                                     text = text.filter { ch -> (ch == '.' || ch.isDigit()) }.let {
                                         var rtString = it
                                         while (rtString.indexOf('.') != rtString.lastIndexOf(
@@ -269,6 +263,11 @@ class MainActivity : ComponentActivity() {
                                     }.trim()
                                     callback(text.toBigDecimalOrNull())
                                 } else {
+                                    Toast.makeText(
+                                        this,
+                                        "text processed: ${it.exception?.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
                                     callback(null)
                                 }
                             }
