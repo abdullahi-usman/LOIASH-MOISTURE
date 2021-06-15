@@ -4,7 +4,9 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.preference.PreferenceManager
 import android.renderscript.ScriptGroup
+import android.widget.Space
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -74,6 +76,7 @@ class MainActivity : ComponentActivity() {
         val REQUIRED_PERMISSIONS = arrayOf(android.Manifest.permission.CAMERA)
     }
 
+    private val CAMERA_ZOOM_LEVEL = "CAMERA_ZOOM_LEVEL"
     private lateinit var cameraExecutor: ExecutorService
     private var cameraView: PreviewView? = null
     private var camera: Camera? = null
@@ -88,6 +91,9 @@ class MainActivity : ComponentActivity() {
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         initializeDatabase()
+
+        val pref = PreferenceManager.getDefaultSharedPreferences(this)
+
 
         setContent {
 
@@ -124,8 +130,17 @@ class MainActivity : ComponentActivity() {
                 else mutableStateOf(true)
             }
 
+            val cameraZoomState = rememberSaveable {
+                mutableStateOf(pref.getFloat(CAMERA_ZOOM_LEVEL, 0.5f))
+            }
+
             LaunchedEffect(key1 = flashLightState.value) {
                 camera?.cameraControl?.enableTorch(flashLightState.value)
+            }
+
+            LaunchedEffect(key1 = cameraZoomState.value){
+                camera?.cameraControl?.setLinearZoom(cameraZoomState.value)
+                pref.edit().putFloat(CAMERA_ZOOM_LEVEL, cameraZoomState.value).apply()
             }
 
             JugWriterTheme {
@@ -190,7 +205,7 @@ class MainActivity : ComponentActivity() {
 
                     if (cameraState.value && permissionGranted.value) {
                         CameraView(
-                            contextAmbient, lifecycleOwner,
+                            contextAmbient, lifecycleOwner, cameraZoomState,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(150.dp)
@@ -342,6 +357,7 @@ fun AboutDialog(title: CharSequence, permissionGranted: MutableState<Boolean>) {
 fun CameraView(
     contextAmbient: Context,
     lifecycleOwner: LifecycleOwner,
+    cameraFocus: MutableState<Float>,
     modifier: Modifier,
     onCameraSetup: (cameraView: PreviewView, camera: Camera) -> Unit
 ) {
@@ -381,6 +397,22 @@ fun CameraView(
 
         return@AndroidView cameraView
     }, modifier = modifier)
+
+    Spacer(modifier = Modifier.height(2.dp))
+
+    Box(modifier = Modifier.padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+
+            Text(text = "Zoom: ", fontSize = 14.sp)
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            Slider(value = cameraFocus.value, onValueChange = {
+                cameraFocus.value = it
+            })
+        }
+
+    }
 }
 
 operator fun BigDecimal?.plus(value: BigDecimal?): BigDecimal {
