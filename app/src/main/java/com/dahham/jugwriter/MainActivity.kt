@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.renderscript.ScriptGroup
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11,6 +12,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.CameraController
+import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.InteractionSource
@@ -45,11 +48,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.lifecycleScope
+import androidx.core.graphics.scale
+import androidx.lifecycle.*
 import androidx.room.*
 import androidx.room.OnConflictStrategy.REPLACE
 import com.dahham.jugwriter.ui.theme.JugWriterTheme
@@ -74,6 +76,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var cameraExecutor: ExecutorService
     private var cameraView: PreviewView? = null
+    private var camera: Camera? = null
     private lateinit var database: WorkDatabase
     private lateinit var databaseDao: JobDao
     private var jobs: MutableState<List<Job>?> = mutableStateOf(arrayListOf())
@@ -111,6 +114,19 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf(Job())
             }
 
+            val cameraState = remember(key1 = permissionGranted.value) {
+                mutableStateOf(permissionGranted.value)
+            }
+
+            val flashLightState = remember {
+                if (cameraView == null)
+                    mutableStateOf(false)
+                else mutableStateOf(true)
+            }
+
+            LaunchedEffect(key1 = flashLightState.value) {
+                camera?.cameraControl?.enableTorch(flashLightState.value)
+            }
 
             JugWriterTheme {
                 BottomSheetScaffold(
@@ -121,7 +137,8 @@ class MainActivity : ComponentActivity() {
                                     scope.launch {
                                         withContext(Dispatchers.IO) {
                                             databaseDao.Delete(
-                                                job = jobs.value?.toTypedArray() ?: return@withContext
+                                                job = jobs.value?.toTypedArray()
+                                                    ?: return@withContext
                                             )
                                         }
                                     }
@@ -151,9 +168,10 @@ class MainActivity : ComponentActivity() {
                                         Text(text = bStateTitle)
                                     }
                                 })
-                            }, scaffoldState = innerScaffoldState) {
+                            }, scaffoldState = innerScaffoldState
+                        ) {
 
-                            RecentJobsView(it, jobs.value){
+                            RecentJobsView(it, jobs.value) {
                                 scope.launch {
                                     bottomSheetScaffoldState.bottomSheetState.collapse()
                                 }
@@ -163,24 +181,26 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     topBar = {
-                        AppTopAppBar(title = title.toString())
+                        AppTopAppBar(
+                            title = title.toString(), permissionGranted.value,
+                            cameraState, flashLightState
+                        )
                     }, scaffoldState = bottomSheetScaffoldState
                 ) {
 
-                    if (permissionGranted.value) {
+                    if (cameraState.value && permissionGranted.value) {
                         CameraView(
                             contextAmbient, lifecycleOwner,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(150.dp)
-                        ) { _cameraView ->
+                        ) { _cameraView, _camera ->
                             cameraView = _cameraView
+                            camera = _camera
                         }
-                    } else {
+                    } else if (permissionGranted.value.not()) {
                         AboutDialog(title, permissionGranted)
                     }
-
-
 
                     Content(textFromCamera = when (permissionGranted.value) {
                         true -> Content@{ callback ->
@@ -189,19 +209,39 @@ class MainActivity : ComponentActivity() {
                                 TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
                             textRecognizer.process(
+
                                 InputImage.fromBitmap(
-                                    cameraView?.bitmap ?: return@Content, 0
+                                    cameraView?.bitmap?.let {
+                                        var newBitmap = it
+                                        if (cameraView?.width != null && cameraView?.height != null) {
+                                            newBitmap = it.scale(
+                                                cameraView?.width!!,
+                                                cameraView?.height!!
+                                            )
+                                        }
+
+                                        newBitmap
+                                    } ?: return@Content, 0
                                 )
                             ).addOnCompleteListener {
                                 if (it.isSuccessful) {
                                     var text = it.result.text
-                                    Toast.makeText(
-                                        this,
-                                        "text processed: $text",
-                                        Toast.LENGTH_LONG
-                                    )
-                                        .show()
-                                    text = text.filter { ch -> ch == '.' || ch.isDigit() }.trim()
+                                    //Toast.makeText(
+                                    //    this,
+                                    //    "text processed: $text",
+                                    //    Toast.LENGTH_LONG
+                                    //)
+                                    //    .show()
+                                    text = text.filter { ch -> (ch == '.' || ch.isDigit()) }.let {
+                                        var rtString = it
+                                        while (rtString.indexOf('.') != rtString.lastIndexOf(
+                                                '.'
+                                            )
+                                        ) {
+                                            rtString = rtString.replaceFirst(".", "")
+                                        }
+                                        rtString
+                                    }.trim()
                                     callback(text.toBigDecimalOrNull())
                                 } else {
                                     callback(null)
@@ -219,11 +259,12 @@ class MainActivity : ComponentActivity() {
                             if (id != 0L) {
                                 job.value = Job()
                                 bottomSheetScaffoldState.snackbarHostState.showSnackbar("Job saved successfully")
-                            }else {
+                            } else {
                                 bottomSheetScaffoldState.snackbarHostState.showSnackbar("Job not saved")
                             }
                         }
-                    }, job = job.value)
+                    }, job = job.value
+                    )
                 }
             }
         }
@@ -302,7 +343,7 @@ fun CameraView(
     contextAmbient: Context,
     lifecycleOwner: LifecycleOwner,
     modifier: Modifier,
-    onCameraSetup: (cameraView: PreviewView) -> Unit
+    onCameraSetup: (cameraView: PreviewView, camera: Camera) -> Unit
 ) {
 
     val cameraProvider = remember {
@@ -310,6 +351,8 @@ fun CameraView(
     }
     AndroidView(factory = {
         val cameraView = PreviewView(it)
+        var camera: Camera? = null
+        cameraView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
 
         cameraProvider.addListener({
             val cameraProviderInner = cameraProvider.get()
@@ -320,16 +363,18 @@ fun CameraView(
 
             try {
                 cameraProviderInner.unbindAll()
-                cameraProviderInner.bindToLifecycle(
+                camera = cameraProviderInner.bindToLifecycle(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_BACK_CAMERA,
                     preview
                 )
+
+                camera?.cameraControl?.setLinearZoom(0.8f)
             } catch (ex: Exception) {
 
             }
 
-            onCameraSetup(cameraView)
+            onCameraSetup(cameraView, camera!!)
         }, ContextCompat.getMainExecutor(it))
 
 
@@ -375,14 +420,21 @@ fun Content(
         mutableStateOf(job.w3.toEngineeringString())
     }
 
-    val answer = rememberSaveable(inputs = arrayOf(w1.value, w2.value, w3.value, saveableJob.lastJobOperator)) {
+    val answer = rememberSaveable(
+        inputs = arrayOf(
+            w1.value,
+            w2.value,
+            w3.value,
+            saveableJob.lastJobOperator
+        )
+    ) {
         saveableJob.w1 = w1.value.toBigDecimal()
         saveableJob.w2 = w2.value.toBigDecimal()
         saveableJob.w3 = w3.value.toBigDecimal()
 
         return@rememberSaveable try {
             mutableStateOf(saveableJob.calculate())
-        }catch (ex: ArithmeticException){
+        } catch (ex: ArithmeticException) {
             mutableStateOf(BigDecimal(0))
         }
     }
@@ -406,7 +458,9 @@ fun Content(
                     null -> 0.dp; else -> 20.dp
                 }
             ), horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = when(textFromCamera){ null -> Arrangement.Center; else -> Arrangement.Top }
+        verticalArrangement = when (textFromCamera) {
+            null -> Arrangement.Center; else -> Arrangement.Top
+        }
     ) {
 
         Row(
@@ -416,7 +470,10 @@ fun Content(
         ) {
 
             OutlinedButton(onClick = { jobAnalysisToggle.value = jobAnalysisToggle.value.not() }) {
-                Row(modifier = Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(text = saveableJob.lastJobOperator.name)
                     Spacer(modifier = Modifier.width(6.dp))
                     Icon(
@@ -476,18 +533,20 @@ fun Content(
                 value = w1.value,
                 onValueChange = { it ->
 
-                    if (it.isEmpty()){
+                    if (it.isEmpty()) {
                         w1.value = "0"
-                    }else if (w1.value == "0" && it.length == 2 && it[1] == '0'){
+                    } else if (w1.value == "0" && it.length == 2 && it[1] == '0') {
                         w1.value = it[0].toString()
-                    }else if(it.endsWith('.')){
+                    } else if (it.endsWith('.')) {
                         w1.value = it.replace(".", "").plus('.')
-                    }else {
-                        w1.value = it.filter {  (it == '.' || it.isDigit()) }.trim().toBigDecimal().toEngineeringString()
+                    } else {
+                        w1.value = it.filter { (it == '.' || it.isDigit()) }.trim().toBigDecimal()
+                            .toEngineeringString()
                     }
                 },
                 label = { Text(text = "First Weight(W1)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
 
             if (textFromCamera != null) {
                 IconButton(onClick = {
@@ -515,12 +574,13 @@ fun Content(
                 onValueChange = {
                     if (it.isEmpty()) {
                         w2.value = "0"
-                    }else if (w2.value == "0" && it.length == 2 && it[1] == '0'){
+                    } else if (w2.value == "0" && it.length == 2 && it[1] == '0') {
                         w2.value = it[0].toString()
-                    } else if(it.endsWith('.')){
+                    } else if (it.endsWith('.')) {
                         w2.value = it.replace(".", "").plus('.')
-                    }else {
-                        w2.value =  it.filter {  (it == '.' || it.isDigit()) }.trim().toBigDecimal().toEngineeringString()
+                    } else {
+                        w2.value = it.filter { (it == '.' || it.isDigit()) }.trim().toBigDecimal()
+                            .toEngineeringString()
                     }
                 },
                 label = { Text(text = "Second Weight(W2)") },
@@ -550,18 +610,20 @@ fun Content(
             OutlinedTextField(
                 value = w3.value,
                 onValueChange = {
-                    if (it.isEmpty()){
+                    if (it.isEmpty()) {
                         w3.value = "0"
-                    }else if (w3.value == "0" && it.length == 2 && it[1] == '0'){
+                    } else if (w3.value == "0" && it.length == 2 && it[1] == '0') {
                         w3.value = it[0].toString()
-                    } else if(it.endsWith('.')){
+                    } else if (it.endsWith('.')) {
                         w3.value = it.replace(".", "").plus('.')
-                    }else {
-                        w3.value = it.filter {  (it == '.' || it.isDigit()) }.trim().toBigDecimal().toEngineeringString()
+                    } else {
+                        w3.value = it.filter { (it == '.' || it.isDigit()) }.trim().toBigDecimal()
+                            .toEngineeringString()
                     }
                 },
                 label = { Text(text = "Third Weight(W3)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
 
             if (textFromCamera != null) {
 
@@ -582,21 +644,71 @@ fun Content(
 
 
 @Composable
-fun AppTopAppBar(title: String) {
+fun AppTopAppBar(
+    title: String,
+    cameraIsAvailable: Boolean,
+    cameraState: MutableState<Boolean>,
+    flashLightState: MutableState<Boolean>
+) {
 
     val openDialog = remember {
         mutableStateOf(false)
     }
 
-    TopAppBar(title = { Text(text = title) }, actions = {
-        TextButton(onClick = { openDialog.value = true }) {
-            Text(
-                text = "About", modifier = Modifier
-                    .padding(end = 6.dp),
-                color = MaterialTheme.colors.secondaryVariant
-            )
-        }
-    })
+    val openMoreOverflow = remember {
+        mutableStateOf(false)
+    }
+
+    TopAppBar(
+        title = { Text(text = title) },
+        actions = {
+
+            if (cameraIsAvailable) {
+                IconButton(onClick = { flashLightState.value = flashLightState.value.not() }) {
+                    Icon(
+                        painter = painterResource(
+                            id = when (flashLightState.value) {
+                                true -> R.drawable.ic_baseline_flash_off_24; else -> R.drawable.ic_baseline_flash_on_24
+                            }
+                        ),
+                        contentDescription = ""
+                    )
+                }
+
+                IconButton(onClick = { cameraState.value = cameraState.value.not() }) {
+                    Icon(
+                        painter = painterResource(
+                            id = when (cameraState.value) {
+                                true -> R.drawable.ic_baseline_camera_off_24; else -> R.drawable.ic_baseline_camera_on_24
+                            }
+                        ),
+                        contentDescription = ""
+                    )
+                }
+
+            }
+            IconButton(onClick = {
+                openMoreOverflow.value = openMoreOverflow.value.not()
+            }) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_baseline_more_vert_24),
+                    contentDescription = ""
+                )
+            }
+
+            DropdownMenu(expanded = openMoreOverflow.value,
+                onDismissRequest = { openMoreOverflow.value = openMoreOverflow.value.not() }) {
+                DropdownMenuItem(onClick = {
+                    openDialog.value = true; openMoreOverflow.value = openMoreOverflow.value.not()
+                }) {
+                    Text(
+                        text = "About", modifier = Modifier
+                            .padding(end = 6.dp),
+                        color = MaterialTheme.colors.secondaryVariant
+                    )
+                }
+            }
+        })
 
     if (openDialog.value) {
         AlertDialog(onDismissRequest = { openDialog.value = false },
@@ -640,7 +752,11 @@ fun AppTopAppBar(title: String) {
 
 @ExperimentalMaterialApi
 @Composable
-fun RecentJobsView( paddingValues: PaddingValues, all: List<Job>?, onContinueJobClicked: (job: Job) -> Unit) {
+fun RecentJobsView(
+    paddingValues: PaddingValues,
+    all: List<Job>?,
+    onContinueJobClicked: (job: Job) -> Unit
+) {
 
 
     if (all == null || all.isEmpty()) {
@@ -668,7 +784,9 @@ fun RecentJobsView( paddingValues: PaddingValues, all: List<Job>?, onContinueJob
     } else {
         LazyColumn(contentPadding = paddingValues) {
 
-            itemsIndexed(items = all, key =  {index, item -> return@itemsIndexed item.uid.toString() + item.w1.toString() + item.w2.toString() + item.w3.toString() }) { index, job ->
+            itemsIndexed(
+                items = all,
+                key = { index, item -> return@itemsIndexed item.uid.toString() + item.w1.toString() + item.w2.toString() + item.w3.toString() }) { index, job ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -702,7 +820,10 @@ fun JobView(job: Job, onContinueJobClicked: (job: Job) -> Unit) {
             .padding(8.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(text = "ID: ${job.uid} -  (${job.lastJobOperator.name})", color = MaterialTheme.colors.secondary)
+            Text(
+                text = "ID: ${job.uid} -  (${job.lastJobOperator.name})",
+                color = MaterialTheme.colors.secondary
+            )
             Text(text = date, color = MaterialTheme.colors.secondaryVariant)
         }
 
@@ -717,7 +838,13 @@ fun JobView(job: Job, onContinueJobClicked: (job: Job) -> Unit) {
                 Text(text = "Third  Weight: ${job.w3}", fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Result: ${job.calculate()}",
+                    text = "Result: ${
+                        try {
+                            job.calculate()
+                        } catch (ex: ArithmeticException) {
+                            "0"
+                        }
+                    }",
                     fontSize = 16.sp,
                     color = MaterialTheme.colors.primaryVariant
                 )
