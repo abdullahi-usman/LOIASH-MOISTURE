@@ -891,6 +891,13 @@ data class Job(
     var lastJobOperator: JobOperator = JobOperator.LOI
 ) {
 
+    var title: String = ""
+    var notes: String = ""
+    /*Ugly hack to get around database migration becuase of adding new fields*/
+    var ext1: String = ""
+    var ext2: String = ""
+    var ext3: String = ""
+
     enum class JobOperator {
 
         LOI {
