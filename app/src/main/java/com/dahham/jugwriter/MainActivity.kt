@@ -149,14 +149,21 @@ class MainActivity : ComponentActivity() {
                         Scaffold(
                             floatingActionButton = {
                                 FloatingActionButton(onClick = {
-                                    scope.launch {
-                                        withContext(Dispatchers.IO) {
-                                            databaseDao.Delete(
-                                                job = jobs.value?.toTypedArray()
-                                                    ?: return@withContext
-                                            )
-                                        }
-                                    }
+                                    androidx.appcompat.app.AlertDialog.Builder(contextAmbient).setMessage("Do you want to delete all recent jobs?")
+                                        .setNegativeButton("No"){
+                                            dialog, index ->
+                                            dialog.dismiss()
+                                        }.setPositiveButton("Yes") { dialog, index ->
+                                            dialog.dismiss()
+                                            scope.launch {
+                                                withContext(Dispatchers.IO) {
+                                                    databaseDao.Delete(
+                                                        job = jobs.value?.toTypedArray()
+                                                            ?: return@withContext
+                                                    )
+                                                }
+                                            }
+                                        }.show()
                                 }) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.ic_baseline_delete_24),
