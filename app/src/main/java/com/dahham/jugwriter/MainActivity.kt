@@ -5,17 +5,11 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.preference.PreferenceManager
-import android.util.TypedValue
-import android.view.ViewGroup
-import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -32,9 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -54,12 +46,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.scale
-import androidx.core.view.MarginLayoutParamsCompat
 import androidx.lifecycle.*
 import androidx.room.*
 import androidx.room.OnConflictStrategy.REPLACE
 import com.dahham.jugwriter.ui.theme.JugWriterTheme
-import com.google.android.gms.common.util.SharedPreferencesUtils
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizerOptions
@@ -274,7 +264,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                         rtString
                                     }.trim()
-                                    callback(text.toBigDecimalOrNull())
+                                    callback(text.toFloat())
                                 } else {
                                     Toast.makeText(
                                         this,
@@ -453,7 +443,7 @@ fun CameraView(
 
 @Composable
 fun Content(
-    textFromCamera: ((onTextResult: (value: BigDecimal?) -> Unit) -> Unit)?,
+    textFromCamera: ((onTextResult: (value: Float?) -> Unit) -> Unit)?,
     onSaveJob: ((job: Job) -> Unit)? = null, onClear: (() -> Unit), job: Job
 ) {
 
@@ -468,13 +458,13 @@ fun Content(
     }
 
     val w1 = rememberSaveable(inputs = arrayOf(job)) {
-        mutableStateOf(job.w1.toEngineeringString())
+        mutableStateOf(job.w1.toString())
     }
     val w2 = rememberSaveable(inputs = arrayOf(job)) {
-        mutableStateOf(job.w2.toEngineeringString())
+        mutableStateOf(job.w2.toString())
     }
     val w3 = rememberSaveable(inputs = arrayOf(job)) {
-        mutableStateOf(job.w3.toEngineeringString())
+        mutableStateOf(job.w3.toString())
     }
 
     val modified = remember {
@@ -491,9 +481,9 @@ fun Content(
             saveableJob.lastJobOperator
         )
     ) {
-        saveableJob.w1 = w1.value.toBigDecimal()
-        saveableJob.w2 = w2.value.toBigDecimal()
-        saveableJob.w3 = w3.value.toBigDecimal()
+        saveableJob.w1 = w1.value.toFloat()
+        saveableJob.w2 = w2.value.toFloat()
+        saveableJob.w3 = w3.value.toFloat()
 
         modified.value = saveableJob.sameAs(job).not()
 
@@ -505,9 +495,9 @@ fun Content(
     }
 
     var currentCameraPosition = w1
-    val onCameraText: (text: BigDecimal?) -> Unit = {
+    val onCameraText: (text: Float?) -> Unit = {
         if (it != null) {
-            currentCameraPosition.value = it.toEngineeringString()
+            currentCameraPosition.value = it.toString()
         }
     }
 
@@ -637,18 +627,30 @@ fun Content(
                 OutlinedTextField(
                     singleLine = true,
                     value = w1.value,
-                    onValueChange = { it ->
+                    onValueChange = { __ignoreStr ->
+                        scope.launch {
+                            var tempStr = __ignoreStr
+                            withContext(Dispatchers.Default) {
 
-                        if (it.isEmpty()) {
-                            w1.value = "0"
-                        } else if (w1.value == "0" && it.length == 2 && it[1] == '0') {
-                            w1.value = it[0].toString()
-                        } else if (it.endsWith('.')) {
-                            w1.value = it.replace(".", "").plus('.')
-                        } else {
-                            w1.value =
-                                it.filter { (it == '.' || it.isDigit()) }.trim().toBigDecimal()
-                                    .toEngineeringString()
+                                while (tempStr.indexOf('.') != tempStr.lastIndexOf('.')) {
+                                    tempStr = tempStr.replace(".", "").trim().plus(".")
+                                }
+
+                                while (tempStr.startsWith('0') && tempStr.indexOf('.') != 1){
+                                    tempStr = tempStr.replaceFirst("0", "")
+                                }
+
+                                if (tempStr.isEmpty()) {
+                                    tempStr = "0"
+                                }
+
+                                if (w1.value.length == 1 && tempStr.length == 2 && w1.value == "0"){
+                                    tempStr = tempStr.replaceFirst("0", "")
+                                }
+
+                                tempStr = tempStr.filter { (it == '.' || it.isDigit()) }
+                            }
+                            w1.value = tempStr
                         }
                     },
                     label = { Text(text = "First Weight(W1)") },
@@ -689,17 +691,30 @@ fun Content(
                     },
                     singleLine = true,
                     value = w2.value,
-                    onValueChange = {
-                        if (it.isEmpty()) {
-                            w2.value = "0"
-                        } else if (w2.value == "0" && it.length == 2 && it[1] == '0') {
-                            w2.value = it[0].toString()
-                        } else if (it.endsWith('.')) {
-                            w2.value = it.replace(".", "").plus('.')
-                        } else {
-                            w2.value =
-                                it.filter { (it == '.' || it.isDigit()) }.trim().toBigDecimal()
-                                    .toEngineeringString()
+                    onValueChange = {  __ignoreStr ->
+                        scope.launch {
+                            var tempStr = __ignoreStr
+                            withContext(Dispatchers.Default) {
+
+                                while (tempStr.indexOf('.') != tempStr.lastIndexOf('.')) {
+                                    tempStr = tempStr.replace(".", "").trim().plus(".")
+                                }
+
+                                while (tempStr.startsWith('0') && tempStr.indexOf('.') != 1){
+                                    tempStr = tempStr.replaceFirst("0", "")
+                                }
+
+                                if (tempStr.isEmpty()) {
+                                    tempStr = "0"
+                                }
+
+                                if (w2.value.length == 1 && tempStr.length == 2 && w2.value == "0"){
+                                    tempStr = tempStr.replaceFirst("0", "")
+                                }
+
+                                tempStr = tempStr.filter { (it == '.' || it.isDigit()) }
+                            }
+                            w2.value = tempStr
                         }
                     },
                     label = { Text(text = "Second Weight(W2)") },
@@ -740,17 +755,30 @@ fun Content(
                     },
                     singleLine = true,
                     value = w3.value,
-                    onValueChange = {
-                        if (it.isEmpty()) {
-                            w3.value = "0"
-                        } else if (w3.value == "0" && it.length == 2 && it[1] == '0') {
-                            w3.value = it[0].toString()
-                        } else if (it.endsWith('.')) {
-                            w3.value = it.replace(".", "").plus('.')
-                        } else {
-                            w3.value =
-                                it.filter { (it == '.' || it.isDigit()) }.trim().toBigDecimal()
-                                    .toEngineeringString()
+                    onValueChange = { __ignoreStr ->
+                        scope.launch {
+                            var tempStr = __ignoreStr
+                            withContext(Dispatchers.Default) {
+
+                                while (tempStr.indexOf('.') != tempStr.lastIndexOf('.')) {
+                                    tempStr = tempStr.replace(".", "").trim().plus(".")
+                                }
+
+                                while (tempStr.startsWith('0') && tempStr.indexOf('.') != 1){
+                                    tempStr = tempStr.replaceFirst("0", "")
+                                }
+
+                                if (tempStr.isEmpty()) {
+                                    tempStr = "0"
+                                }
+
+                                if (w3.value.length == 1 && tempStr.length == 2 && w3.value == "0"){
+                                    tempStr = tempStr.replaceFirst("0", "")
+                                }
+
+                                tempStr = tempStr.filter { (it == '.' || it.isDigit()) }
+                            }
+                            w3.value = tempStr
                         }
                     },
                     label = { Text(text = "Third Weight(W3)") },
@@ -1020,9 +1048,9 @@ fun Content() {
 data class Job(
     @PrimaryKey(autoGenerate = true) val uid: Int = 0,
     var date: Date = Calendar.getInstance().time,
-    var w1: BigDecimal = BigDecimal(0),
-    var w2: BigDecimal = BigDecimal(0),
-    var w3: BigDecimal = BigDecimal(0),
+    var w1: Float = 0f,
+    var w2: Float = 0f,
+    var w3: Float = 0f,
     var lastJobOperator: JobOperator = JobOperator.LOI
 ) {
 
@@ -1037,25 +1065,25 @@ data class Job(
     enum class JobOperator {
 
         LOI {
-            override fun calculate(job: Job): BigDecimal {
-                return ((job.w2 - job.w3) / (job.w2 - job.w1)) * BigDecimal(100)
+            override fun calculate(job: Job): Float {
+                return ((job.w2 - job.w3) / (job.w2 - job.w1)) * 100f
             }
         },
         ASH {
-            override fun calculate(job: Job): BigDecimal {
-                return BigDecimal(100) - LOI.calculate(job)
+            override fun calculate(job: Job): Float {
+                return 100 - LOI.calculate(job)
             }
         },
         MOISTURE {
-            override fun calculate(job: Job): BigDecimal {
+            override fun calculate(job: Job): Float {
                 return LOI.calculate(job)
             }
         };
 
-        abstract fun calculate(job: Job): BigDecimal
+        abstract fun calculate(job: Job): Float
     }
 
-    fun calculate(): BigDecimal {
+    fun calculate(): Float {
         return lastJobOperator.calculate(job = this)
     }
 
