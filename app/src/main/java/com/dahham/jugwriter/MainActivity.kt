@@ -6,11 +6,16 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.preference.PreferenceManager
+import android.util.TypedValue
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.widget.LinearLayoutCompat
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -49,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.scale
+import androidx.core.view.MarginLayoutParamsCompat
 import androidx.lifecycle.*
 import androidx.room.*
 import androidx.room.OnConflictStrategy.REPLACE
@@ -329,11 +335,14 @@ fun AboutDialog(title: CharSequence, permissionGranted: MutableState<Boolean>) {
         rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestMultiplePermissions()) { isGranted ->
             permissionGranted.value = isGranted[Manifest.permission.CAMERA] ?: false
 
-            if (permissionGranted.value){
-                androidx.appcompat.app.AlertDialog.Builder(contextAmbient).setMessage("Using camera to take sample weight is highly dependent on the quality of the device camera, condition of the environment(e.g dusty) and condition of the surface of the display screen of the weighing device")
-                    .setNeutralButton("Ok") {
-                    dialog, index -> dialog.dismiss()
-                }.show()
+            if (permissionGranted.value) {
+
+                androidx.appcompat.app.AlertDialog.Builder(contextAmbient)
+                    .setView(R.layout.camera_about_notice)
+                    .setNeutralButton("Ok") { dialog, index ->
+                        dialog.dismiss()
+                    }.show()
+
             }
         }
 
@@ -669,7 +678,7 @@ fun Content(
                     modifier = Modifier.onFocusChanged { event ->
                         if (event.toString() == "Active" && scrollState.isScrollInProgress.not()) {
                             scope.launch {
-                                with(localDensity){
+                                with(localDensity) {
                                     scrollState.animateScrollTo(70.dp.toPx().toInt())
                                 }
 
@@ -716,12 +725,11 @@ fun Content(
             ) {
 
 
-
                 OutlinedTextField(
                     modifier = Modifier.onFocusChanged { event ->
                         if (event.toString() == "Active" && scrollState.isScrollInProgress.not()) {
                             scope.launch {
-                                with(localDensity){
+                                with(localDensity) {
                                     scrollState.animateScrollTo(130.dp.toPx().toInt())
                                 }
 
