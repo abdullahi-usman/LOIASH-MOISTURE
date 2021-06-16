@@ -79,7 +79,6 @@ class MainActivity : ComponentActivity() {
 
         val pref = PreferenceManager.getDefaultSharedPreferences(this)
 
-
         setContent {
 
             val contextAmbient = LocalContext.current
@@ -247,7 +246,7 @@ class MainActivity : ComponentActivity() {
                                 } else {
                                     Toast.makeText(
                                         this,
-                                        "text processed: ${it.exception?.message}",
+                                        "Text Processed Error: ${it.exception?.message}",
                                         Toast.LENGTH_LONG
                                     ).show()
                                     callback(null)
@@ -269,8 +268,9 @@ class MainActivity : ComponentActivity() {
                                 bottomSheetScaffoldState.snackbarHostState.showSnackbar("Job not saved")
                             }
                         }
-                    }, job = job.value
-                    )
+                    }, onClear = {
+                        job.value = Job()
+                    }, job = job.value)
                 }
             }
         }
@@ -419,7 +419,7 @@ operator fun BigDecimal?.plus(value: BigDecimal?): BigDecimal {
 @Composable
 fun Content(
     textFromCamera: ((onTextResult: (value: BigDecimal?) -> Unit) -> Unit)?,
-    onSaveJob: ((job: Job) -> Unit)? = null, job: Job
+    onSaveJob: ((job: Job) -> Unit)? = null, onClear:(() -> Unit), job: Job
 ) {
 
     /*
@@ -442,6 +442,10 @@ fun Content(
         mutableStateOf(job.w3.toEngineeringString())
     }
 
+    val modified = remember{
+        mutableStateOf(job != saveableJob)
+    }
+
     val answer = rememberSaveable(
         inputs = arrayOf(
             w1.value,
@@ -453,6 +457,8 @@ fun Content(
         saveableJob.w1 = w1.value.toBigDecimal()
         saveableJob.w2 = w2.value.toBigDecimal()
         saveableJob.w3 = w3.value.toBigDecimal()
+
+        modified.value = (job != saveableJob)
 
         return@rememberSaveable try {
             mutableStateOf(saveableJob.calculate())
@@ -473,6 +479,7 @@ fun Content(
     }
 
     val scrollState = rememberScrollState()
+    val contextAmbient = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -481,12 +488,15 @@ fun Content(
             .padding(
                 top = when (textFromCamera) {
                     null -> 0.dp; else -> 20.dp
-                }
+                }, bottom = 150.dp
             ), horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = when (textFromCamera) {
             null -> Arrangement.Center; else -> Arrangement.Top
         }
     ) {
+
+        Text(modifier = Modifier.fillMaxWidth(),
+            text = "Current Job: " + if (job.uid == 0) "New Job(Unsaved)" else "ID - " + job.uid.toString() + if (modified.value) "(Modified)" else "", textAlign = TextAlign.Start )
 
         Row(
             modifier = Modifier
@@ -522,10 +532,32 @@ fun Content(
 
             }
 
-            Button(onClick = {
-                onSaveJob?.invoke(saveableJob)
-            }) {
-                Text(text = "Save Job")
+            Row {
+
+                Button(onClick = {
+                    if (saveableJob.uid != 0 && modified.value){
+                     androidx.appcompat.app.AlertDialog.Builder(contextAmbient).setMessage("This job is from the database but currently modified. \n Do you want clear changes?")
+                         .setPositiveButton("Yes"){
+                             dialog, index -> dialog.dismiss()
+                             onClear()
+                         }   .setNegativeButton("No"){
+                             dialog, index ->
+                             dialog.dismiss()
+                         }.show()
+                    }else {
+                        onClear()
+                    }
+                }) {
+                    Text(text = "Clear")
+                }
+                
+                Spacer(modifier = Modifier.width(2.dp))
+
+                Button(onClick = {
+                    onSaveJob?.invoke(saveableJob)
+                }) {
+                    Text(text = "Save Job")
+                }
             }
         }
 
@@ -946,6 +978,17 @@ data class Job(
 
     fun calculate(): BigDecimal {
         return lastJobOperator.calculate(job = this)
+    }
+
+    override fun equals(other: Any?): Boolean {
+
+        if (other != null && other is Job && other.uid == uid
+            && other.w1 == w1 && other.w2 == w2 && other.w3 == w3
+            && other.lastJobOperator == lastJobOperator) {
+            return true
+        }
+
+        return false
     }
 
 }
