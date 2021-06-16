@@ -450,16 +450,6 @@ fun CameraView(
     }
 }
 
-operator fun BigDecimal?.plus(value: BigDecimal?): BigDecimal {
-    if (this != null && value == null)
-        return this
-
-    if (this == null && value != null)
-        return value
-
-    return this!!.plus(other = value!!)
-}
-
 
 @Composable
 fun Content(
