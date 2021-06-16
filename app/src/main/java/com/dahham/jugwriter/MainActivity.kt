@@ -59,6 +59,7 @@ import androidx.lifecycle.*
 import androidx.room.*
 import androidx.room.OnConflictStrategy.REPLACE
 import com.dahham.jugwriter.ui.theme.JugWriterTheme
+import com.google.android.gms.common.util.SharedPreferencesUtils
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizerOptions
@@ -93,7 +94,8 @@ class MainActivity : ComponentActivity() {
         initializeDatabase()
 
         if (savedInstanceState == null) {
-            pref = PreferenceManager.getDefaultSharedPreferences(this)
+
+            pref = getSharedPreferences("CAMERA_PREF", 0)
             cameraExecutors = Executors.newSingleThreadExecutor()
         }
 
@@ -142,7 +144,7 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(key1 = cameraZoomState.value) {
                 camera?.cameraControl?.setLinearZoom(cameraZoomState.value)?.addListener({
-                    pref?.edit()?.putFloat(CAMERA_ZOOM_LEVEL, cameraZoomState.value)?.apply()
+                    pref?.edit()?.putFloat(CAMERA_ZOOM_LEVEL, cameraZoomState.value)?.commit()
                 }, cameraExecutors)
 
             }
@@ -223,6 +225,7 @@ class MainActivity : ComponentActivity() {
                         ) { _cameraView, _camera ->
                             cameraView = _cameraView
                             camera = _camera
+                            camera?.cameraControl?.setLinearZoom(cameraZoomState.value)
                         }
                     } else if (permissionGranted.value.not()) {
                         AboutDialog(title, permissionGranted)
