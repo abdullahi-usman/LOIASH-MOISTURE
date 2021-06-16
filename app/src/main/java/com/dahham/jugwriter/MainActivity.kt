@@ -93,9 +93,10 @@ class MainActivity : ComponentActivity() {
 
         initializeDatabase()
 
-        if (savedInstanceState == null) {
-
+        if (pref == null){
             pref = getSharedPreferences("CAMERA_PREF", 0)
+        }
+        if (this::cameraExecutors.isInitialized.not()){
             cameraExecutors = Executors.newSingleThreadExecutor()
         }
 

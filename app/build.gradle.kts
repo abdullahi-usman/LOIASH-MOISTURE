@@ -33,7 +33,7 @@ android {
 
         debug {
 
-            applicationIdSuffix = ".debug"
+            //applicationIdSuffix = ".debug"
         }
     }
     compileOptions {
