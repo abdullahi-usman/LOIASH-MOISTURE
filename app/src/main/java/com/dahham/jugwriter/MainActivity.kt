@@ -87,6 +87,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var databaseDao: JobDao
     private var jobs: MutableState<List<Job>?> = mutableStateOf(arrayListOf())
 
+    private val CAMERA_PREFERRED_STATE = "CAMERA_PREFERRED_STATE"
+
     @ExperimentalMaterialApi
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -96,6 +98,7 @@ class MainActivity : ComponentActivity() {
         if (pref == null){
             pref = getSharedPreferences("CAMERA_PREF", 0)
         }
+
         if (this::cameraExecutors.isInitialized.not()){
             cameraExecutors = Executors.newSingleThreadExecutor()
         }
@@ -125,8 +128,8 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf(Job())
             }
 
-            val cameraState = remember(key1 = permissionGranted.value) {
-                mutableStateOf(permissionGranted.value)
+            val cameraState = rememberSaveable {
+                mutableStateOf(pref?.getBoolean(CAMERA_PREFERRED_STATE, true) ?: true)
             }
 
             val flashLightState = remember {
@@ -148,6 +151,11 @@ class MainActivity : ComponentActivity() {
                     pref?.edit()?.putFloat(CAMERA_ZOOM_LEVEL, cameraZoomState.value)?.commit()
                 }, cameraExecutors)
 
+            }
+
+            LaunchedEffect(key1 = cameraState.value){
+                pref?.edit()?.putBoolean(CAMERA_PREFERRED_STATE, cameraState.value)
+                    ?.apply()
             }
 
             JugWriterTheme {
@@ -799,15 +807,17 @@ fun AppTopAppBar(
         actions = {
 
             if (cameraIsAvailable) {
-                IconButton(onClick = { flashLightState.value = flashLightState.value.not() }) {
-                    Icon(
-                        painter = painterResource(
-                            id = when (flashLightState.value) {
-                                true -> R.drawable.ic_baseline_flash_off_24; else -> R.drawable.ic_baseline_flash_on_24
-                            }
-                        ),
-                        contentDescription = ""
-                    )
+                if(cameraState.value) {
+                    IconButton(onClick = { flashLightState.value = flashLightState.value.not() }) {
+                        Icon(
+                            painter = painterResource(
+                                id = when (flashLightState.value) {
+                                    true -> R.drawable.ic_baseline_flash_off_24; else -> R.drawable.ic_baseline_flash_on_24
+                                }
+                            ),
+                            contentDescription = ""
+                        )
+                    }
                 }
 
                 IconButton(onClick = { cameraState.value = cameraState.value.not() }) {
