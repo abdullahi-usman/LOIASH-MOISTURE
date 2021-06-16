@@ -591,6 +591,7 @@ fun Content(
             ) {
 
                 OutlinedTextField(
+                    singleLine = true,
                     value = w1.value,
                     onValueChange = { it ->
 
@@ -632,6 +633,7 @@ fun Content(
             ) {
 
                 OutlinedTextField(
+                    singleLine = true,
                     value = w2.value,
                     onValueChange = {
                         if (it.isEmpty()) {
@@ -671,6 +673,7 @@ fun Content(
             ) {
 
                 OutlinedTextField(
+                    singleLine = true,
                     value = w3.value,
                     onValueChange = {
                         if (it.isEmpty()) {
