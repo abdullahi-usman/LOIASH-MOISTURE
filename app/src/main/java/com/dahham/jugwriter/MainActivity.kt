@@ -2,6 +2,7 @@ package com.dahham.jugwriter
 
 import android.Manifest
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.preference.PreferenceManager
@@ -26,8 +27,12 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusState
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -58,6 +63,8 @@ import java.math.BigDecimal
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -66,7 +73,9 @@ class MainActivity : ComponentActivity() {
 
     private val CAMERA_ZOOM_LEVEL = "CAMERA_ZOOM_LEVEL"
     private var cameraView: PreviewView? = null
+    private lateinit var cameraExecutors: ExecutorService
     private var camera: Camera? = null
+    private var pref: SharedPreferences? = null
     private lateinit var database: WorkDatabase
     private lateinit var databaseDao: JobDao
     private var jobs: MutableState<List<Job>?> = mutableStateOf(arrayListOf())
@@ -77,7 +86,10 @@ class MainActivity : ComponentActivity() {
 
         initializeDatabase()
 
-        val pref = PreferenceManager.getDefaultSharedPreferences(this)
+        if (savedInstanceState == null) {
+            pref = PreferenceManager.getDefaultSharedPreferences(this)
+            cameraExecutors = Executors.newSingleThreadExecutor()
+        }
 
         setContent {
 
@@ -115,16 +127,18 @@ class MainActivity : ComponentActivity() {
             }
 
             val cameraZoomState = rememberSaveable {
-                mutableStateOf(pref.getFloat(CAMERA_ZOOM_LEVEL, 0.5f))
+                mutableStateOf(pref?.getFloat(CAMERA_ZOOM_LEVEL, 0.5f) ?: 0.5f)
             }
 
             LaunchedEffect(key1 = flashLightState.value) {
                 camera?.cameraControl?.enableTorch(flashLightState.value)
             }
 
-            LaunchedEffect(key1 = cameraZoomState.value){
-                camera?.cameraControl?.setLinearZoom(cameraZoomState.value)
-                pref.edit().putFloat(CAMERA_ZOOM_LEVEL, cameraZoomState.value).apply()
+            LaunchedEffect(key1 = cameraZoomState.value) {
+                camera?.cameraControl?.setLinearZoom(cameraZoomState.value)?.addListener({
+                    pref?.edit()?.putFloat(CAMERA_ZOOM_LEVEL, cameraZoomState.value)?.apply()
+                }, cameraExecutors)
+
             }
 
             JugWriterTheme {
@@ -133,9 +147,9 @@ class MainActivity : ComponentActivity() {
                         Scaffold(
                             floatingActionButton = {
                                 FloatingActionButton(onClick = {
-                                    androidx.appcompat.app.AlertDialog.Builder(contextAmbient).setMessage("Do you want to delete all recent jobs?")
-                                        .setNegativeButton("No"){
-                                            dialog, index ->
+                                    androidx.appcompat.app.AlertDialog.Builder(contextAmbient)
+                                        .setMessage("Do you want to delete all recent jobs?")
+                                        .setNegativeButton("No") { dialog, index ->
                                             dialog.dismiss()
                                         }.setPositiveButton("Yes") { dialog, index ->
                                             dialog.dismiss()
@@ -270,7 +284,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }, onClear = {
                         job.value = Job()
-                    }, job = job.value)
+                    }, job = job.value
+                    )
                 }
             }
         }
@@ -298,6 +313,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        cameraExecutors.shutdown()
     }
 
     private fun allPermissionGranted() = REQUIRED_PERMISSIONS.all {
@@ -419,7 +435,7 @@ operator fun BigDecimal?.plus(value: BigDecimal?): BigDecimal {
 @Composable
 fun Content(
     textFromCamera: ((onTextResult: (value: BigDecimal?) -> Unit) -> Unit)?,
-    onSaveJob: ((job: Job) -> Unit)? = null, onClear:(() -> Unit), job: Job
+    onSaveJob: ((job: Job) -> Unit)? = null, onClear: (() -> Unit), job: Job
 ) {
 
     /*
@@ -442,9 +458,11 @@ fun Content(
         mutableStateOf(job.w3.toEngineeringString())
     }
 
-    val modified = remember{
+    val modified = remember {
         mutableStateOf(job != saveableJob)
     }
+
+    val scope = rememberCoroutineScope()
 
     val answer = rememberSaveable(
         inputs = arrayOf(
@@ -494,8 +512,11 @@ fun Content(
         }
     ) {
 
-        Text(modifier = Modifier.fillMaxWidth(),
-            text = "Current Job: " + if (job.uid == 0) "New Job (Unsaved)" else "ID - " + job.uid.toString() + if (modified.value) " (Modified)" else "", textAlign = TextAlign.Start )
+        Text(
+            modifier = Modifier.fillMaxWidth(),
+            text = "Current Job: " + if (job.uid == 0) "New Job (Unsaved)" else "ID - " + job.uid.toString() + if (modified.value) " (Modified)" else "",
+            textAlign = TextAlign.Start
+        )
 
         Row(
             modifier = Modifier
@@ -534,22 +555,22 @@ fun Content(
             Row {
 
                 Button(onClick = {
-                    if (saveableJob.uid != 0 && modified.value){
-                     androidx.appcompat.app.AlertDialog.Builder(contextAmbient).setMessage("This job is from the database but currently modified. \n Do you want clear changes?")
-                         .setPositiveButton("Yes"){
-                             dialog, index -> dialog.dismiss()
-                             onClear()
-                         }   .setNegativeButton("No"){
-                             dialog, index ->
-                             dialog.dismiss()
-                         }.show()
-                    }else {
+                    if (saveableJob.uid != 0 && modified.value) {
+                        androidx.appcompat.app.AlertDialog.Builder(contextAmbient)
+                            .setMessage("This job is from the database but currently modified. \n Do you want clear changes?")
+                            .setPositiveButton("Yes") { dialog, index ->
+                                dialog.dismiss()
+                                onClear()
+                            }.setNegativeButton("No") { dialog, index ->
+                                dialog.dismiss()
+                            }.show()
+                    } else {
                         onClear()
                     }
                 }) {
                     Text(text = "Clear")
                 }
-                
+
                 Spacer(modifier = Modifier.width(2.dp))
 
                 Button(onClick = {
@@ -579,10 +600,14 @@ fun Content(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        Column(modifier = Modifier.verticalScroll(scrollState)
-            .fillMaxSize()
-            .padding(bottom = 250.dp)) {
+        Column(
+            modifier = Modifier
+                .verticalScroll(scrollState)
+                .fillMaxSize()
+                .padding(bottom = 250.dp)
+        ) {
 
+            val localDensity = LocalDensity.current
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -633,6 +658,16 @@ fun Content(
             ) {
 
                 OutlinedTextField(
+                    modifier = Modifier.onFocusChanged { event ->
+                        if (event.toString() == "Active" && scrollState.isScrollInProgress.not()) {
+                            scope.launch {
+                                with(localDensity){
+                                    scrollState.animateScrollTo(70.dp.toPx().toInt())
+                                }
+
+                            }
+                        }
+                    },
                     singleLine = true,
                     value = w2.value,
                     onValueChange = {
@@ -672,7 +707,19 @@ fun Content(
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
+
+
                 OutlinedTextField(
+                    modifier = Modifier.onFocusChanged { event ->
+                        if (event.toString() == "Active" && scrollState.isScrollInProgress.not()) {
+                            scope.launch {
+                                with(localDensity){
+                                    scrollState.animateScrollTo(130.dp.toPx().toInt())
+                                }
+
+                            }
+                        }
+                    },
                     singleLine = true,
                     value = w3.value,
                     onValueChange = {
@@ -961,6 +1008,7 @@ data class Job(
 
     var title: String = ""
     var notes: String = ""
+
     /*Ugly hack to get around database migration becuase of adding new fields*/
     var ext1: String = ""
     var ext2: String = ""
@@ -993,10 +1041,11 @@ data class Job(
 
     //Compose may be using equals in some way, so we cant override,
     //Currently we dont know how to override equals in a safe way wihtout breaking compose [job.value]
-    fun sameAs(other: Any?): Boolean{
+    fun sameAs(other: Any?): Boolean {
         if (other != null && other is Job && other.uid == uid
             && other.w1 == w1 && other.w2 == w2 && other.w3 == w3
-            && other.lastJobOperator == lastJobOperator) {
+            && other.lastJobOperator == lastJobOperator
+        ) {
             return true
         }
 
