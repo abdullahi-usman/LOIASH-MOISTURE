@@ -484,11 +484,10 @@ fun Content(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
             .padding(
                 top = when (textFromCamera) {
                     null -> 0.dp; else -> 20.dp
-                }, bottom = 150.dp
+                }, bottom = 50.dp
             ), horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = when (textFromCamera) {
             null -> Arrangement.Center; else -> Arrangement.Top
@@ -580,118 +579,127 @@ fun Content(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Column(modifier = Modifier.verticalScroll(scrollState)
+            .fillMaxSize()
+            .padding(bottom = 250.dp)) {
 
-            OutlinedTextField(
-                value = w1.value,
-                onValueChange = { it ->
 
-                    if (it.isEmpty()) {
-                        w1.value = "0"
-                    } else if (w1.value == "0" && it.length == 2 && it[1] == '0') {
-                        w1.value = it[0].toString()
-                    } else if (it.endsWith('.')) {
-                        w1.value = it.replace(".", "").plus('.')
-                    } else {
-                        w1.value = it.filter { (it == '.' || it.isDigit()) }.trim().toBigDecimal()
-                            .toEngineeringString()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+                OutlinedTextField(
+                    value = w1.value,
+                    onValueChange = { it ->
+
+                        if (it.isEmpty()) {
+                            w1.value = "0"
+                        } else if (w1.value == "0" && it.length == 2 && it[1] == '0') {
+                            w1.value = it[0].toString()
+                        } else if (it.endsWith('.')) {
+                            w1.value = it.replace(".", "").plus('.')
+                        } else {
+                            w1.value =
+                                it.filter { (it == '.' || it.isDigit()) }.trim().toBigDecimal()
+                                    .toEngineeringString()
+                        }
+                    },
+                    label = { Text(text = "First Weight(W1)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
+                if (textFromCamera != null) {
+                    IconButton(onClick = {
+                        currentCameraPosition = w1
+                        textFromCamera.invoke(onCameraText)
+                    }, modifier = Modifier.padding(6.dp)) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_baseline_camera_24),
+                            contentDescription = ""
+                        )
                     }
-                },
-                label = { Text(text = "First Weight(W1)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
-
-            if (textFromCamera != null) {
-                IconButton(onClick = {
-                    currentCameraPosition = w1
-                    textFromCamera.invoke(onCameraText)
-                }, modifier = Modifier.padding(6.dp)) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_baseline_camera_24),
-                        contentDescription = ""
-                    )
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
 
-            OutlinedTextField(
-                value = w2.value,
-                onValueChange = {
-                    if (it.isEmpty()) {
-                        w2.value = "0"
-                    } else if (w2.value == "0" && it.length == 2 && it[1] == '0') {
-                        w2.value = it[0].toString()
-                    } else if (it.endsWith('.')) {
-                        w2.value = it.replace(".", "").plus('.')
-                    } else {
-                        w2.value = it.filter { (it == '.' || it.isDigit()) }.trim().toBigDecimal()
-                            .toEngineeringString()
+                OutlinedTextField(
+                    value = w2.value,
+                    onValueChange = {
+                        if (it.isEmpty()) {
+                            w2.value = "0"
+                        } else if (w2.value == "0" && it.length == 2 && it[1] == '0') {
+                            w2.value = it[0].toString()
+                        } else if (it.endsWith('.')) {
+                            w2.value = it.replace(".", "").plus('.')
+                        } else {
+                            w2.value =
+                                it.filter { (it == '.' || it.isDigit()) }.trim().toBigDecimal()
+                                    .toEngineeringString()
+                        }
+                    },
+                    label = { Text(text = "Second Weight(W2)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
+                if (textFromCamera != null) {
+                    IconButton(onClick = {
+                        currentCameraPosition = w2
+                        textFromCamera.invoke(onCameraText)
+                    }, modifier = Modifier.padding(6.dp)) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_baseline_camera_24),
+                            contentDescription = ""
+                        )
                     }
-                },
-                label = { Text(text = "Second Weight(W2)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
-
-            if (textFromCamera != null) {
-                IconButton(onClick = {
-                    currentCameraPosition = w2
-                    textFromCamera.invoke(onCameraText)
-                }, modifier = Modifier.padding(6.dp)) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_baseline_camera_24),
-                        contentDescription = ""
-                    )
                 }
             }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
 
-            OutlinedTextField(
-                value = w3.value,
-                onValueChange = {
-                    if (it.isEmpty()) {
-                        w3.value = "0"
-                    } else if (w3.value == "0" && it.length == 2 && it[1] == '0') {
-                        w3.value = it[0].toString()
-                    } else if (it.endsWith('.')) {
-                        w3.value = it.replace(".", "").plus('.')
-                    } else {
-                        w3.value = it.filter { (it == '.' || it.isDigit()) }.trim().toBigDecimal()
-                            .toEngineeringString()
+                OutlinedTextField(
+                    value = w3.value,
+                    onValueChange = {
+                        if (it.isEmpty()) {
+                            w3.value = "0"
+                        } else if (w3.value == "0" && it.length == 2 && it[1] == '0') {
+                            w3.value = it[0].toString()
+                        } else if (it.endsWith('.')) {
+                            w3.value = it.replace(".", "").plus('.')
+                        } else {
+                            w3.value =
+                                it.filter { (it == '.' || it.isDigit()) }.trim().toBigDecimal()
+                                    .toEngineeringString()
+                        }
+                    },
+                    label = { Text(text = "Third Weight(W3)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+
+                if (textFromCamera != null) {
+
+                    IconButton(onClick = {
+                        currentCameraPosition = w3
+                        textFromCamera.invoke(onCameraText)
+                    }, modifier = Modifier.padding(6.dp)) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_baseline_camera_24),
+                            contentDescription = ""
+                        )
                     }
-                },
-                label = { Text(text = "Third Weight(W3)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-            )
-
-            if (textFromCamera != null) {
-
-                IconButton(onClick = {
-                    currentCameraPosition = w3
-                    textFromCamera.invoke(onCameraText)
-                }, modifier = Modifier.padding(6.dp)) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_baseline_camera_24),
-                        contentDescription = ""
-                    )
                 }
             }
         }
