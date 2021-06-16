@@ -324,9 +324,17 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AboutDialog(title: CharSequence, permissionGranted: MutableState<Boolean>) {
+    val contextAmbient = LocalContext.current
     val permissionLauncher =
         rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestMultiplePermissions()) { isGranted ->
             permissionGranted.value = isGranted[Manifest.permission.CAMERA] ?: false
+
+            if (permissionGranted.value){
+                androidx.appcompat.app.AlertDialog.Builder(contextAmbient).setMessage("Using camera to take sample weight is highly dependent on the quality of the device camera, condition of the environment(e.g dusty) and condition of the surface of the display screen of the weighing device")
+                    .setNeutralButton("Ok") {
+                    dialog, index -> dialog.dismiss()
+                }.show()
+            }
         }
 
     val dialog = remember { mutableStateOf(true) }
