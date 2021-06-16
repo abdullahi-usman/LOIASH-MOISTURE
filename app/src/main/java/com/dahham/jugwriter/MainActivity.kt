@@ -458,7 +458,7 @@ fun Content(
         saveableJob.w2 = w2.value.toBigDecimal()
         saveableJob.w3 = w3.value.toBigDecimal()
 
-        modified.value = (job != saveableJob)
+        modified.value = saveableJob.sameAs(job).not()
 
         return@rememberSaveable try {
             mutableStateOf(saveableJob.calculate())
@@ -496,7 +496,7 @@ fun Content(
     ) {
 
         Text(modifier = Modifier.fillMaxWidth(),
-            text = "Current Job: " + if (job.uid == 0) "New Job(Unsaved)" else "ID - " + job.uid.toString() + if (modified.value) "(Modified)" else "", textAlign = TextAlign.Start )
+            text = "Current Job: " + if (job.uid == 0) "New Job (Unsaved)" else "ID - " + job.uid.toString() + if (modified.value) " (Modified)" else "", textAlign = TextAlign.Start )
 
         Row(
             modifier = Modifier
@@ -980,8 +980,9 @@ data class Job(
         return lastJobOperator.calculate(job = this)
     }
 
-    override fun equals(other: Any?): Boolean {
-
+    //Compose may be using equals in some way, so we cant override,
+    //Currently we dont know how to override equals in a safe way wihtout breaking compose [job.value]
+    fun sameAs(other: Any?): Boolean{
         if (other != null && other is Job && other.uid == uid
             && other.w1 == w1 && other.w2 == w2 && other.w3 == w3
             && other.lastJobOperator == lastJobOperator) {
