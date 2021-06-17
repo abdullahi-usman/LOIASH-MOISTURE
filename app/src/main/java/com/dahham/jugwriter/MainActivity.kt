@@ -192,7 +192,7 @@ class MainActivity : ComponentActivity() {
 
     private fun saveJob(
         job: MutableState<Job>,
-    ):  ((job: Job) -> Unit) = { _job ->
+    ): ((job: Job) -> Unit) = { _job ->
 
         lifecycleScope.launch {
             var id: Long
@@ -205,11 +205,15 @@ class MainActivity : ComponentActivity() {
                 job.value = Job()
                 str = "Job saved successfully - ID: $id"
             } else {
-               str = "Job not saved"
+                str = "Job not saved"
             }
 
 
-            val snackbar = com.google.android.material.snackbar.Snackbar.make(this@MainActivity.window?.peekDecorView() ?: return@launch, str, com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+            val snackbar = com.google.android.material.snackbar.Snackbar.make(
+                this@MainActivity.window?.peekDecorView() ?: return@launch,
+                str,
+                com.google.android.material.snackbar.Snackbar.LENGTH_LONG
+            )
             val snackbarView = snackbar.view
             val snackbarLayoutParams = snackbarView.layoutParams as FrameLayout.LayoutParams
             snackbarLayoutParams.gravity = Gravity.TOP
@@ -667,189 +671,65 @@ class MainActivity : ComponentActivity() {
                     .fillMaxSize()
             ) {
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                arrayOf(w1, w2, w3).forEachIndexed{index, inputField ->
+                    key(index) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
 
-                    OutlinedTextField(
-                        singleLine = true,
-                        value = w1.value,
-                        onValueChange = { __ignoreStr ->
-                            scope.launch {
-                                var tempStr = __ignoreStr
-                                withContext(Dispatchers.Default) {
+                            OutlinedTextField(
+                                singleLine = true,
+                                value = inputField.value,
+                                onValueChange = { __ignoreStr ->
+                                    scope.launch {
+                                        var tempStr = __ignoreStr
+                                        withContext(Dispatchers.Default) {
 
-                                    while (tempStr.indexOf('.') != tempStr.lastIndexOf('.')) {
-                                        tempStr = tempStr.replace(".", "").trim().plus(".")
+                                            while (tempStr.indexOf('.') != tempStr.lastIndexOf('.')) {
+                                                tempStr = tempStr.replace(".", "").trim().plus(".")
+                                            }
+
+                                            while (tempStr.startsWith('0') && tempStr.indexOf('.') != 1) {
+                                                tempStr = tempStr.replaceFirst("0", "")
+                                            }
+
+                                            if (tempStr.isEmpty()) {
+                                                tempStr = "0"
+                                            }
+
+                                            if (inputField.value.length == 1 && tempStr.length == 2 && inputField.value == "0") {
+                                                tempStr = tempStr.replaceFirst("0", "")
+                                            }
+
+                                            tempStr = tempStr.filter { (it == '.' || it.isDigit()) }
+                                        }
+                                        inputField.value = tempStr
                                     }
-
-                                    while (tempStr.startsWith('0') && tempStr.indexOf('.') != 1) {
-                                        tempStr = tempStr.replaceFirst("0", "")
-                                    }
-
-                                    if (tempStr.isEmpty()) {
-                                        tempStr = "0"
-                                    }
-
-                                    if (w1.value.length == 1 && tempStr.length == 2 && w1.value == "0") {
-                                        tempStr = tempStr.replaceFirst("0", "")
-                                    }
-
-                                    tempStr = tempStr.filter { (it == '.' || it.isDigit()) }
-                                }
-                                w1.value = tempStr
-                            }
-                        },
-                        label = { Text(text = "First Weight(W1)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
-
-                    if (textFromCamera != null) {
-                        IconButton(onClick = {
-                            currentCameraPosition = w1
-                            textFromCamera.invoke(onCameraText)
-                        }, modifier = Modifier.padding(6.dp)) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_baseline_camera_24),
-                                contentDescription = ""
+                                },
+                                label = { Text(text = "First Weight(W1)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                             )
+
+                            if (textFromCamera != null) {
+                                IconButton(onClick = {
+                                    currentCameraPosition = inputField
+                                    textFromCamera.invoke(onCameraText)
+                                }, modifier = Modifier.padding(6.dp)) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_baseline_camera_24),
+                                        contentDescription = ""
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-
-                    OutlinedTextField(
-                        /* modifier = Modifier
-                        .onFocusChanged { event ->
-                        if (event.toString() == "Active" && scrollState.isScrollInProgress.not()) {
-                            scope.launch {
-                                with(localDensity) {
-                                    scrollState.animateScrollTo(70.dp.toPx().toInt())
-                                }
-
-                            }
-                        }
-                    },*/
-                        singleLine = true,
-                        value = w2.value,
-                        onValueChange = { __ignoreStr ->
-                            scope.launch {
-                                var tempStr = __ignoreStr
-                                withContext(Dispatchers.Default) {
-
-                                    while (tempStr.indexOf('.') != tempStr.lastIndexOf('.')) {
-                                        tempStr = tempStr.replace(".", "").trim().plus(".")
-                                    }
-
-                                    while (tempStr.startsWith('0') && tempStr.indexOf('.') != 1) {
-                                        tempStr = tempStr.replaceFirst("0", "")
-                                    }
-
-                                    if (tempStr.isEmpty()) {
-                                        tempStr = "0"
-                                    }
-
-                                    if (w2.value.length == 1 && tempStr.length == 2 && w2.value == "0") {
-                                        tempStr = tempStr.replaceFirst("0", "")
-                                    }
-
-                                    tempStr = tempStr.filter { (it == '.' || it.isDigit()) }
-                                }
-                                w2.value = tempStr
-                            }
-                        },
-                        label = { Text(text = "Second Weight(W2)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
-
-                    if (textFromCamera != null) {
-                        IconButton(onClick = {
-                            currentCameraPosition = w2
-                            textFromCamera.invoke(onCameraText)
-                        }, modifier = Modifier.padding(6.dp)) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_baseline_camera_24),
-                                contentDescription = ""
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-
-
-                    OutlinedTextField(
-                        /* modifier = Modifier.onFocusChanged { event ->
-                        if (event.toString() == "Active" && scrollState.isScrollInProgress.not()) {
-                            scope.launch {
-                                with(localDensity) {
-                                    scrollState.animateScrollTo(130.dp.toPx().toInt())
-                                }
-
-                            }
-                        }
-                    },*/
-                        singleLine = true,
-                        value = w3.value,
-                        onValueChange = { __ignoreStr ->
-                            scope.launch {
-                                var tempStr = __ignoreStr
-                                withContext(Dispatchers.Default) {
-
-                                    while (tempStr.indexOf('.') != tempStr.lastIndexOf('.')) {
-                                        tempStr = tempStr.replace(".", "").trim().plus(".")
-                                    }
-
-                                    while (tempStr.startsWith('0') && tempStr.indexOf('.') != 1) {
-                                        tempStr = tempStr.replaceFirst("0", "")
-                                    }
-
-                                    if (tempStr.isEmpty()) {
-                                        tempStr = "0"
-                                    }
-
-                                    if (w3.value.length == 1 && tempStr.length == 2 && w3.value == "0") {
-                                        tempStr = tempStr.replaceFirst("0", "")
-                                    }
-
-                                    tempStr = tempStr.filter { (it == '.' || it.isDigit()) }
-                                }
-                                w3.value = tempStr
-                            }
-                        },
-                        label = { Text(text = "Third Weight(W3)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                    )
-
-                    if (textFromCamera != null) {
-
-                        IconButton(onClick = {
-                            currentCameraPosition = w3
-                            textFromCamera.invoke(onCameraText)
-                        }, modifier = Modifier.padding(6.dp)) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_baseline_camera_24),
-                                contentDescription = ""
-                            )
-                        }
-                    }
                 }
             }
-
         }
     }
 
