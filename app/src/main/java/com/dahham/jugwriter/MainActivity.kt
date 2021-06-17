@@ -252,18 +252,21 @@ class MainActivity : ComponentActivity() {
                                 )
                             ).addOnCompleteListener {
                                 if (it.isSuccessful) {
-                                    var text = it.result.text
-                                    text = text.filter { ch -> (ch == '.' || ch.isDigit()) }.let {
+                                    var text = it.result?.text
+                                    text = text?.filter { ch -> (ch == '.' || ch.isDigit()) }?.let {
                                         var rtString = it
-                                        while (rtString.indexOf('.') != rtString.lastIndexOf(
-                                                '.'
-                                            )
-                                        ) {
+                                        while (rtString.indexOf('.') != rtString.lastIndexOf('.')) {
                                             rtString = rtString.replaceFirst(".", "")
                                         }
                                         rtString
-                                    }.trim()
-                                    callback(text.toFloat())
+                                    }?.trim()
+
+                                    try {
+                                        callback(text?.toFloat())
+                                    }catch (ex: NumberFormatException){
+                                        Toast.makeText(contextAmbient, "No text found!", Toast.LENGTH_LONG).show()
+                                    }
+
                                 } else {
                                     Toast.makeText(
                                         this,
