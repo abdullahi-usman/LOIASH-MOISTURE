@@ -26,7 +26,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -511,11 +510,14 @@ fun Content(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(
                 top = when (textFromCamera) {
                     null -> 0.dp; else -> 20.dp
-                }, bottom = 50.dp
-            ), horizontalAlignment = Alignment.CenterHorizontally,
+                },
+                bottom = 300.dp
+            )
+        , horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = when (textFromCamera) {
             null -> Arrangement.Center; else -> Arrangement.Top
         }
@@ -609,13 +611,8 @@ fun Content(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        Column(
-            modifier = Modifier
-                .verticalScroll(scrollState)
-                .fillMaxSize()
-                .padding(bottom = 250.dp)
-        ) {
-
+        Column(modifier = Modifier
+                .fillMaxSize()) {
             val localDensity = LocalDensity.current
 
             Row(
@@ -679,7 +676,8 @@ fun Content(
             ) {
 
                 OutlinedTextField(
-                    modifier = Modifier.onFocusChanged { event ->
+                   /* modifier = Modifier
+                        .onFocusChanged { event ->
                         if (event.toString() == "Active" && scrollState.isScrollInProgress.not()) {
                             scope.launch {
                                 with(localDensity) {
@@ -688,7 +686,7 @@ fun Content(
 
                             }
                         }
-                    },
+                    },*/
                     singleLine = true,
                     value = w2.value,
                     onValueChange = {  __ignoreStr ->
@@ -743,7 +741,7 @@ fun Content(
 
 
                 OutlinedTextField(
-                    modifier = Modifier.onFocusChanged { event ->
+                   /* modifier = Modifier.onFocusChanged { event ->
                         if (event.toString() == "Active" && scrollState.isScrollInProgress.not()) {
                             scope.launch {
                                 with(localDensity) {
@@ -752,7 +750,7 @@ fun Content(
 
                             }
                         }
-                    },
+                    },*/
                     singleLine = true,
                     value = w3.value,
                     onValueChange = { __ignoreStr ->
