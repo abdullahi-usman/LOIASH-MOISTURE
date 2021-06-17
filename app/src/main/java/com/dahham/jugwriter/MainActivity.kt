@@ -229,8 +229,8 @@ class MainActivity : ComponentActivity() {
                         AboutDialog(title, permissionGranted)
                     }
 
-                    Content(textFromCamera = when (permissionGranted.value) {
-                        true -> Content@{ callback ->
+                    Content(textFromCamera = when (permissionGranted.value && cameraState.value) {
+                        true -> ContentCameraReturnPosition@{ callback ->
 
                             val textRecognizer =
                                 TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
@@ -248,7 +248,7 @@ class MainActivity : ComponentActivity() {
                                         }
 
                                         newBitmap
-                                    } ?: return@Content, 0
+                                    } ?: return@ContentCameraReturnPosition, 0
                                 )
                             ).addOnCompleteListener {
                                 if (it.isSuccessful) {
