@@ -13,8 +13,8 @@ android {
         applicationId = "com.dahham.jugwriter"
         minSdk = 21
         targetSdk = 30
-        versionCode = 4
-        versionName = "1.1.2"
+        versionCode = 10
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
