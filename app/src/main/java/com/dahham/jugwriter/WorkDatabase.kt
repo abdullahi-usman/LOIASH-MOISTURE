@@ -1,10 +1,13 @@
 package com.dahham.jugwriter
 
+import android.os.Parcelable
 import androidx.lifecycle.LiveData
 import androidx.room.*
 import java.util.*
+import kotlinx.parcelize.Parcelize
 
 @Entity(tableName = "Jobs")
+@Parcelize
 data class Job(
     @PrimaryKey(autoGenerate = true) val uid: Int = 0,
     var date: Date = Calendar.getInstance().time,
@@ -12,7 +15,7 @@ data class Job(
     var w2: Float = 0f,
     var w3: Float = 0f,
     var lastJobOperator: JobOperator = JobOperator.LOI
-) {
+): Parcelable {
 
     var title: String = ""
     var notes: String = ""
