@@ -36,6 +36,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -203,7 +204,7 @@ class MainActivity : ComponentActivity() {
             val str: String
             if (id != 0L) {
                 job.value = Job()
-                str = "Job saved successfully - ID: $id"
+                str = "Job saved successfully -  (Job ID: $id)  ${SimpleDateFormat("HH:MM:SS", Locale.getDefault()).format(_job.date)}"
             } else {
                 str = "Job not saved"
             }
@@ -906,7 +907,7 @@ class MainActivity : ComponentActivity() {
         val date = remember {
             SimpleDateFormat.getDateTimeInstance(
                 DateFormat.SHORT,
-                DateFormat.SHORT,
+                DateFormat.MEDIUM,
                 Locale.getDefault()
             ).format(job.date).toString()
         }
@@ -922,7 +923,8 @@ class MainActivity : ComponentActivity() {
             ) {
                 Text(
                     text = "ID: ${job.uid} -  (${job.lastJobOperator.name})",
-                    color = MaterialTheme.colors.secondary
+                    color = MaterialTheme.colors.primaryVariant,
+                    fontWeight = FontWeight.Bold
                 )
                 Text(text = date, color = MaterialTheme.colors.secondaryVariant)
             }
