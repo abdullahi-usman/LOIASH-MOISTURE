@@ -25,6 +25,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -125,26 +127,6 @@ class MainActivity : ComponentActivity() {
                 else mutableStateOf(true)
             }
 
-            val cameraZoomState = remember {
-                mutableStateOf(pref?.getFloat(CAMERA_ZOOM_LEVEL, 0.5f) ?: 0.5f)
-            }
-
-            LaunchedEffect(key1 = flashLightState.value) {
-                camera?.cameraControl?.enableTorch(flashLightState.value)
-            }
-
-            LaunchedEffect(key1 = cameraZoomState.value) {
-                camera?.cameraControl?.setLinearZoom(cameraZoomState.value)?.addListener({
-                    pref?.edit()?.putFloat(CAMERA_ZOOM_LEVEL, cameraZoomState.value)?.apply()
-                }, cameraExecutors)
-
-            }
-
-            LaunchedEffect(key1 = cameraState.value) {
-                pref?.edit()?.putBoolean(CAMERA_PREFERRED_STATE, cameraState.value)
-                    ?.apply()
-            }
-
             JugWriterTheme {
                 BottomSheetScaffold(
                     sheetContent = SheetContent(
@@ -160,14 +142,14 @@ class MainActivity : ComponentActivity() {
                 ) {
 
                     if (cameraState.value && permissionGranted.value) {
-                        CameraView(cameraZoomState,
+                        CameraView(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(150.dp)
                         ) { _cameraView, _camera ->
                             cameraView = _cameraView
                             camera = _camera
-                            camera?.cameraControl?.setLinearZoom(cameraZoomState.value)
+                            camera?.cameraControl?.setLinearZoom(pref?.getFloat(CAMERA_ZOOM_LEVEL, 0.5f) ?: 0.5f)
                         }
                     } else if (permissionGranted.value.not()) {
                         AboutDialog(title, permissionGranted)
@@ -199,7 +181,12 @@ class MainActivity : ComponentActivity() {
             val str: String
             if (id != 0L) {
                 job.value = Job()
-                str = "Job saved successfully -  (Job ID: $id)  ${SimpleDateFormat("HH:MM:SS", Locale.getDefault()).format(_job.date)}"
+                str = "Job saved successfully -  (Job ID: $id)  ${
+                    SimpleDateFormat(
+                        "HH:MM:SS",
+                        Locale.getDefault()
+                    ).format(_job.date)
+                }"
             } else {
                 str = "Job not saved"
             }
@@ -255,7 +242,8 @@ class MainActivity : ComponentActivity() {
                     try {
                         callback(text?.toFloat())
                     } catch (ex: NumberFormatException) {
-                        Toast.makeText(this@MainActivity, "No text found!", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, "No text found!", Toast.LENGTH_LONG)
+                            .show()
                     }
 
                 } else {
@@ -436,7 +424,6 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun CameraView(
-        cameraFocus: MutableState<Float>,
         modifier: Modifier,
         onCameraSetup: (cameraView: PreviewView, camera: Camera) -> Unit
     ) {
@@ -447,6 +434,10 @@ class MainActivity : ComponentActivity() {
         val cameraProvider = remember {
             ProcessCameraProvider.getInstance(contextAmbient)
         }
+        val cameraZoom = rememberSaveable {
+            mutableStateOf(pref?.getFloat(CAMERA_ZOOM_LEVEL, 0.5f) ?: 0.5f)
+        }
+
         AndroidView(factory = {
             val cameraView = PreviewView(it)
             var camera: Camera? = null
@@ -489,8 +480,11 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.width(6.dp))
 
-                Slider(value = cameraFocus.value, onValueChange = {
-                    cameraFocus.value = it
+                Slider(value = cameraZoom.value, onValueChange = {
+                    cameraZoom.value = it
+                    camera?.cameraControl?.setLinearZoom(it)?.addListener({
+                        pref?.edit()?.putFloat(CAMERA_ZOOM_LEVEL, it)?.apply()
+                    }, cameraExecutors)
                 })
             }
 
@@ -677,7 +671,7 @@ class MainActivity : ComponentActivity() {
                     .fillMaxSize()
             ) {
 
-                arrayOf(w1, w2, w3).forEachIndexed{index, inputField ->
+                arrayOf(w1, w2, w3).forEachIndexed { index, inputField ->
                     key(index) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -764,6 +758,7 @@ class MainActivity : ComponentActivity() {
                     if (cameraState.value) {
                         IconButton(onClick = {
                             flashLightState.value = flashLightState.value.not()
+                            camera?.cameraControl?.enableTorch(flashLightState.value)
                         }) {
                             Icon(
                                 painter = painterResource(
@@ -776,7 +771,16 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    IconButton(onClick = { cameraState.value = cameraState.value.not() }) {
+                    IconButton(onClick = {
+                        cameraState.value = cameraState.value.not()
+                        pref?.edit()?.putBoolean(CAMERA_PREFERRED_STATE, cameraState.value)
+                            ?.apply()
+
+                        if (flashLightState.value && cameraState.value.not()){
+                            flashLightState.value = flashLightState.value.not()
+                            camera?.cameraControl?.enableTorch(flashLightState.value)
+                        }
+                    }) {
                         Icon(
                             painter = painterResource(
                                 id = when (cameraState.value) {
