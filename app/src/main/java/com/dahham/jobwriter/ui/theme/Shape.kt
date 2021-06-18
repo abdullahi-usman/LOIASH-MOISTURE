@@ -1,4 +1,4 @@
-package com.dahham.jugwriter.ui.theme
+package com.dahham.jobwriter.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Shapes

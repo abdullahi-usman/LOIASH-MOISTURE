@@ -1,4 +1,4 @@
-package com.dahham.jugwriter
+package com.dahham.jobwriter
 
 import android.os.Parcelable
 import androidx.lifecycle.LiveData

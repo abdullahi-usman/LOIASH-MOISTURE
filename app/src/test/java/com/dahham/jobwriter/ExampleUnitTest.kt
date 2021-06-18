@@ -1,4 +1,4 @@
-package com.dahham.jugwriter
+package com.dahham.jobwriter
 
 import org.junit.Test
 

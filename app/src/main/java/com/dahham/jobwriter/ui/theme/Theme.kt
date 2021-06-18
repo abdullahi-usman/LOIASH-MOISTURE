@@ -1,4 +1,4 @@
-package com.dahham.jugwriter.ui.theme
+package com.dahham.jobwriter.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.MaterialTheme

@@ -1,7 +1,6 @@
-package com.dahham.jugwriter
+package com.dahham.jobwriter
 
 import android.Manifest
-import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -25,8 +24,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,7 +48,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.graphics.scale
 import androidx.lifecycle.*
 import androidx.room.*
-import com.dahham.jugwriter.ui.theme.JugWriterTheme
+import com.dahham.jobwriter.ui.theme.JugWriterTheme
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizerOptions

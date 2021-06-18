@@ -10,7 +10,7 @@ android {
     buildToolsVersion = "30.0.3"
 
     defaultConfig {
-        applicationId = "com.dahham.jugwriter"
+        applicationId = "com.dahham.jobwriter"
         minSdk = 21
         targetSdk = 30
         versionCode = 10
