@@ -83,7 +83,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        initializeDatabase()
+        if (this::database.isInitialized.not()) {
+            initializeDatabase()
+        }
 
         if (pref == null) {
             pref = getSharedPreferences("CAMERA_PREF", 0)
@@ -94,11 +96,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-
-            val contextAmbient = LocalContext.current
-            val lifecycleOwner = LocalLifecycleOwner.current
             val bottomSheetScaffoldState = rememberBottomSheetScaffoldState()
-            val innerScaffoldState = rememberScaffoldState()
 
             val bStateTitle =
                 remember(key1 = bottomSheetScaffoldState.bottomSheetState.isExpanded) {
@@ -127,7 +125,7 @@ class MainActivity : ComponentActivity() {
                 else mutableStateOf(true)
             }
 
-            val cameraZoomState = rememberSaveable {
+            val cameraZoomState = remember {
                 mutableStateOf(pref?.getFloat(CAMERA_ZOOM_LEVEL, 0.5f) ?: 0.5f)
             }
 
@@ -150,10 +148,8 @@ class MainActivity : ComponentActivity() {
             JugWriterTheme {
                 BottomSheetScaffold(
                     sheetContent = SheetContent(
-                        contextAmbient,
                         bottomSheetScaffoldState,
                         bStateTitle,
-                        innerScaffoldState,
                         job
                     ),
                     topBar = AppTopAppBar(
@@ -164,8 +160,7 @@ class MainActivity : ComponentActivity() {
                 ) {
 
                     if (cameraState.value && permissionGranted.value) {
-                        CameraView(
-                            contextAmbient, lifecycleOwner, cameraZoomState,
+                        CameraView(cameraZoomState,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(150.dp)
@@ -180,7 +175,7 @@ class MainActivity : ComponentActivity() {
 
                     Content(
                         textFromCamera = when (permissionGranted.value && cameraState.value) {
-                            true -> recognizeText(contextAmbient)
+                            true -> recognizeText()
                             else -> null
                         }, onSaveJob = saveJob(job), onClear = {
                             job.value = Job()
@@ -225,7 +220,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun recognizeText(contextAmbient: Context): (onTextResult: (value: Float?) -> Unit) -> Unit =
+    private fun recognizeText(): (onTextResult: (value: Float?) -> Unit) -> Unit =
         ContentCameraReturnPosition@{ callback ->
 
             val textRecognizer =
@@ -260,7 +255,7 @@ class MainActivity : ComponentActivity() {
                     try {
                         callback(text?.toFloat())
                     } catch (ex: NumberFormatException) {
-                        Toast.makeText(contextAmbient, "No text found!", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, "No text found!", Toast.LENGTH_LONG).show()
                     }
 
                 } else {
@@ -277,14 +272,14 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun SheetContent(
-        contextAmbient: Context,
         bottomSheetScaffoldState: BottomSheetScaffoldState,
         bStateTitle: String,
-        innerScaffoldState: ScaffoldState,
         job: MutableState<Job>
     ): @Composable (ColumnScope.() -> Unit) =
         {
             val scope = rememberCoroutineScope()
+            val innerScaffoldState = rememberScaffoldState()
+            val contextAmbient = LocalContext.current
 
             Scaffold(
                 floatingActionButton = {
@@ -372,9 +367,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onBackPressed() {
+        cameraView = null
+        camera = null
+
+        this.finish()
+
+        super.onBackPressed()
+    }
+
     override fun onDestroy() {
+        cameraExecutors.shutdownNow()
         super.onDestroy()
-        cameraExecutors.shutdown()
     }
 
     private fun allPermissionGranted() = REQUIRED_PERMISSIONS.all {
@@ -432,12 +436,13 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun CameraView(
-        contextAmbient: Context,
-        lifecycleOwner: LifecycleOwner,
         cameraFocus: MutableState<Float>,
         modifier: Modifier,
         onCameraSetup: (cameraView: PreviewView, camera: Camera) -> Unit
     ) {
+
+        val contextAmbient = LocalContext.current
+        val lifecycleOwner = LocalLifecycleOwner.current
 
         val cameraProvider = remember {
             ProcessCameraProvider.getInstance(contextAmbient)
