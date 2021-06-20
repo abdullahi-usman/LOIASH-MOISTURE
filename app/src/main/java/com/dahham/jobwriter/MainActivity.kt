@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.Gravity
+import android.view.LayoutInflater
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -49,6 +50,7 @@ import androidx.core.graphics.scale
 import androidx.lifecycle.*
 import androidx.room.*
 import com.dahham.jobwriter.ui.theme.JugWriterTheme
+import com.google.common.util.concurrent.ListenableFuture
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizerOptions
@@ -56,7 +58,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.math.BigDecimal
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -143,11 +144,7 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(150.dp)
-                        ) { _cameraView, _camera ->
-                            cameraView = _cameraView
-                            camera = _camera
-                            camera?.cameraControl?.setLinearZoom(pref?.getFloat(CAMERA_ZOOM_LEVEL, 0.5f) ?: 0.5f)
-                        }
+                        )
                     } else if (permissionGranted.value.not()) {
                         AboutDialog(title, permissionGranted)
                     }
@@ -420,10 +417,7 @@ class MainActivity : ComponentActivity() {
 
 
     @Composable
-    fun CameraView(
-        modifier: Modifier,
-        onCameraSetup: (cameraView: PreviewView, camera: Camera) -> Unit
-    ) {
+    fun CameraView(modifier: Modifier) {
 
         val contextAmbient = LocalContext.current
         val lifecycleOwner = LocalLifecycleOwner.current
@@ -435,16 +429,21 @@ class MainActivity : ComponentActivity() {
             mutableStateOf(pref?.getFloat(CAMERA_ZOOM_LEVEL, 0.5f) ?: 0.5f)
         }
 
-        AndroidView(factory = {
-            val cameraView = PreviewView(it)
-            var camera: Camera? = null
-            cameraView.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        var hasInitCamera by remember{
+            mutableStateOf(false)
+        }
+
+        DisposableEffect(key1 = cameraProvider) {
+
+            cameraView = PreviewView(this@MainActivity)
+
+            cameraView?.implementationMode = PreviewView.ImplementationMode.COMPATIBLE
 
             cameraProvider.addListener({
                 val cameraProviderInner = cameraProvider.get()
 
                 val preview = androidx.camera.core.Preview.Builder().build().also {
-                    it.setSurfaceProvider(cameraView.surfaceProvider)
+                    it.setSurfaceProvider(cameraView?.surfaceProvider)
                 }
 
                 try {
@@ -454,19 +453,31 @@ class MainActivity : ComponentActivity() {
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview
                     )
-
-                    camera?.cameraControl?.setLinearZoom(0.8f)
+                    camera?.cameraControl?.setLinearZoom(cameraZoom.value)
                 } catch (ex: Exception) {
-
+                    hasInitCamera = false
                 }
 
-                onCameraSetup(cameraView, camera!!)
-            }, ContextCompat.getMainExecutor(it))
+                hasInitCamera = true
+            }, ContextCompat.getMainExecutor(this@MainActivity))
 
+            onDispose {
+                cameraProvider.cancel(true)
+                hasInitCamera = false
+            }
 
+        }
 
-            return@AndroidView cameraView
-        }, modifier = modifier)
+        if(hasInitCamera && cameraView != null){
+            AndroidView(factory = {
+                return@AndroidView cameraView!!
+            }, modifier = modifier)
+        }else {
+            AndroidView(factory = {
+                return@AndroidView LayoutInflater.from(it)
+                    .inflate(R.layout.camera_not_initialized_error, null, false)
+            }, modifier = modifier)
+        }
 
         Spacer(modifier = Modifier.height(2.dp))
 
@@ -521,24 +532,20 @@ class MainActivity : ComponentActivity() {
 
         val scope = rememberCoroutineScope()
 
-        val answer = rememberSaveable(
-            inputs = arrayOf(
-                w1.value,
-                w2.value,
-                w3.value,
-                saveableJob.lastJobOperator
-            )
-        ) {
-            saveableJob.w1 = w1.value.toFloat()
-            saveableJob.w2 = w2.value.toFloat()
-            saveableJob.w3 = w3.value.toFloat()
+        val answer = remember(key1 = saveableJob.lastJobOperator) {
 
-            modified.value = saveableJob.sameAs(job).not()
+            return@remember try {
+                derivedStateOf {
+                    saveableJob.w1 = w1.value.toFloat()
+                    saveableJob.w2 = w2.value.toFloat()
+                    saveableJob.w3 = w3.value.toFloat()
 
-            return@rememberSaveable try {
-                mutableStateOf(saveableJob.calculate())
+                    modified.value = saveableJob.sameAs(job).not()
+
+                    saveableJob.calculate()
+                }
             } catch (ex: ArithmeticException) {
-                mutableStateOf(BigDecimal(0))
+                mutableStateOf(0f)
             }
         }
 
@@ -773,7 +780,7 @@ class MainActivity : ComponentActivity() {
                         pref?.edit()?.putBoolean(CAMERA_PREFERRED_STATE, cameraState.value)
                             ?.apply()
 
-                        if (flashLightState.value && cameraState.value.not()){
+                        if (flashLightState.value && cameraState.value.not()) {
                             flashLightState.value = flashLightState.value.not()
                             camera?.cameraControl?.enableTorch(flashLightState.value)
                         }
@@ -989,4 +996,3 @@ class MainActivity : ComponentActivity() {
 //    }
     }
 }
-
