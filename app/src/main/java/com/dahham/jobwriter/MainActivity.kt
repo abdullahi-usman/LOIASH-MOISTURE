@@ -26,8 +26,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -42,11 +44,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.scale
+import androidx.core.util.Preconditions
 import androidx.lifecycle.*
 import androidx.room.*
 import com.dahham.jobwriter.ui.theme.JugWriterTheme
@@ -532,18 +537,16 @@ class MainActivity : ComponentActivity() {
 
         val scope = rememberCoroutineScope()
 
-        val answer = remember(key1 = saveableJob.lastJobOperator) {
+        val answer = rememberSaveable(inputs = arrayOf(w1, w2, w3, saveableJob.lastJobOperator)) {
 
-            return@remember try {
-                derivedStateOf {
-                    saveableJob.w1 = w1.value.toFloat()
-                    saveableJob.w2 = w2.value.toFloat()
-                    saveableJob.w3 = w3.value.toFloat()
+            saveableJob.w1 = w1.value.toFloat()
+            saveableJob.w2 = w2.value.toFloat()
+            saveableJob.w3 = w3.value.toFloat()
 
-                    modified.value = saveableJob.sameAs(job).not()
+            modified.value = saveableJob.sameAs(job).not()
 
-                    saveableJob.calculate()
-                }
+            return@rememberSaveable try {
+                mutableStateOf(saveableJob.calculate())
             } catch (ex: ArithmeticException) {
                 mutableStateOf(0f)
             }
@@ -712,7 +715,7 @@ class MainActivity : ComponentActivity() {
                                         inputField.value = tempStr
                                     }
                                 },
-                                label = { Text(text = "First Weight(W1)") },
+                                label = { Text(text = when(index + 1){ 1 -> "First"; 2 -> "Second"; else -> "Third" } +" Weight(W${index+1})") },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                             )
 
