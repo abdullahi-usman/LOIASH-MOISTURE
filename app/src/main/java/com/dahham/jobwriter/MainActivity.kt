@@ -541,7 +541,7 @@ class MainActivity : ComponentActivity() {
 
         val scope = rememberCoroutineScope()
 
-        val answer = rememberSaveable(inputs = arrayOf(w1, w2, w3, saveableJob.lastJobOperator)) {
+        val answer = rememberSaveable(inputs = arrayOf(w1.value, w2.value, w3.value, saveableJob.lastJobOperator)) {
 
             saveableJob.w1 = w1.value.toFloat()
             saveableJob.w2 = w2.value.toFloat()
