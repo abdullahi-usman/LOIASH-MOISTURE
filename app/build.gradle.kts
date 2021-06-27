@@ -14,7 +14,7 @@ android {
         minSdk = 21
         targetSdk = 30
         versionCode = 10
-        versionName = "1.5.1"
+        versionName = "1.6.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -25,7 +25,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -81,7 +81,7 @@ dependencies {
 
     // Add ML Kit dependencies
     implementation ("com.google.android.gms:play-services-mlkit-text-recognition:16.2.0")
-    implementation ("com.google.mlkit:language-id:16.1.1")
+    //implementation ("com.google.mlkit:language-id:16.1.1")
     //implementation ("com.google.mlkit:translate:16.1.2")
 
     //Android Room Library

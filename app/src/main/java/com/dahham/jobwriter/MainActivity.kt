@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,8 +30,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -243,6 +246,7 @@ class MainActivity : ComponentActivity() {
                     } catch (ex: NumberFormatException) {
                         Toast.makeText(this@MainActivity, "No text found!", Toast.LENGTH_LONG)
                             .show()
+                        callback(null)
                     }
 
                 } else {
@@ -552,13 +556,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        var currentCameraPosition = w1
-        val onCameraText: (text: Float?) -> Unit = {
-            if (it != null) {
-                currentCameraPosition.value = it.toString()
-            }
-        }
-
         val jobAnalysisToggle = remember {
             mutableStateOf(false)
         }
@@ -680,6 +677,11 @@ class MainActivity : ComponentActivity() {
 
                 arrayOf(w1, w2, w3).forEachIndexed { index, inputField ->
                     key(index) {
+
+                        val anim = remember{
+                            Animatable(1f)
+                        }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Center,
@@ -687,6 +689,7 @@ class MainActivity : ComponentActivity() {
                         ) {
 
                             OutlinedTextField(
+                                modifier = Modifier.alpha(anim.value),
                                 singleLine = true,
                                 value = inputField.value,
                                 onValueChange = { __ignoreStr ->
@@ -721,8 +724,22 @@ class MainActivity : ComponentActivity() {
 
                             if (textFromCamera != null) {
                                 IconButton(onClick = {
-                                    currentCameraPosition = inputField
-                                    textFromCamera.invoke(onCameraText)
+                                    if(anim.isRunning){
+                                        scope.launch { anim.stop(); anim.animateTo(1f);  }
+                                        return@IconButton
+                                    }else {
+
+                                        textFromCamera.invoke{
+                                            if (it != null) {
+                                                inputField.value = it.toString()
+                                            }
+                                            scope.launch { if (anim.isRunning) anim.stop(); anim.animateTo(1f);  }
+                                        }
+                                        scope.launch { anim.animateTo(0.3f, animationSpec = infiniteRepeatable(
+                                        animation = tween(400))
+                                        )  }
+
+                                    }
                                 }, modifier = Modifier.padding(6.dp)) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.ic_baseline_camera_24),
