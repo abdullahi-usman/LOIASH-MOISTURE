@@ -3,7 +3,9 @@ package com.dahham.jobwriter
 import android.Manifest
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.widget.FrameLayout
@@ -48,17 +50,22 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.component1
 import androidx.core.graphics.scale
+import androidx.core.net.toUri
+import androidx.core.os.EnvironmentCompat
 import androidx.lifecycle.*
 import androidx.room.*
 import com.dahham.jobwriter.ui.theme.JugWriterTheme
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizerOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -209,7 +216,6 @@ class MainActivity : ComponentActivity() {
                 TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
             textRecognizer.process(
-
                 InputImage.fromBitmap(
                     cameraView?.bitmap?.let {
                         var newBitmap = it
@@ -225,17 +231,53 @@ class MainActivity : ComponentActivity() {
                 )
             ).addOnCompleteListener {
                 if (it.isSuccessful) {
-                    var text = it.result?.text
-                    text = text?.filter { ch -> (ch == '.' || ch.isDigit()) }?.let {
-                        var rtString = it
-                        while (rtString.indexOf('.') != rtString.lastIndexOf('.')) {
-                            rtString = rtString.replaceFirst(".", "")
+                    var text = ""
+                    val result = it.result
+
+                    val elements = mutableListOf<Text.Element>()
+
+                    for(blocks in result.textBlocks){
+                        for (lines in blocks.lines){
+                            for (element in lines.elements){
+                                elements.add(element)
+                            }
                         }
-                        rtString
-                    }?.trim()
+                    }
+
+                    elements.sortByDescending { element ->
+                        return@sortByDescending  element.boundingBox?.height()
+                    }
+
+                    if (elements.size > 0) {
+                        val firstElement = elements[0].text
+                        if (firstElement.length > 4 && firstElement.contains('.')) {
+                            text = firstElement
+                        } else {
+                            if (elements.size > 1) {
+                                val secondElement = elements[1].text
+                                if (firstElement.length == 4) {
+                                    text = "$secondElement.$firstElement"
+                                } else if (secondElement.length == 4) {
+                                    text = "$firstElement.$secondElement"
+                                }
+                            }
+                        }
+                    }
+
+                    if (text.isEmpty()) {
+                        text = it.result.text
+                        text = text.filter { ch -> (ch == '.' || ch.isDigit()) }.let {
+
+                            var rtString = it
+                            while (rtString.indexOf('.') != rtString.lastIndexOf('.')) {
+                                rtString = rtString.replaceFirst(".", "")
+                            }
+                            rtString
+                        }.trim()
+                    }
 
                     try {
-                        callback(text?.toFloat())
+                        callback(text.toFloat())
                     } catch (ex: NumberFormatException) {
                         Toast.makeText(this@MainActivity, "No text found!", Toast.LENGTH_LONG)
                             .show()
