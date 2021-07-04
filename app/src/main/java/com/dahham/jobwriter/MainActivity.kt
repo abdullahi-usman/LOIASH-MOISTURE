@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.util.DisplayMetrics
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.widget.FrameLayout
@@ -14,28 +15,33 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.*
-import androidx.compose.foundation.border
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.colorspace.Rgb
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -44,19 +50,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.component1
+import androidx.core.graphics.or
 import androidx.core.graphics.scale
+import androidx.core.graphics.toRectF
+import androidx.core.hardware.display.DisplayManagerCompat
 import androidx.core.net.toUri
 import androidx.core.os.EnvironmentCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.*
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.*
 import com.dahham.jobwriter.ui.theme.JugWriterTheme
+import com.dahham.jobwriter.ui.theme.Shapes
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
@@ -72,7 +87,7 @@ import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-@ExperimentalMaterialApi
+
 class MainActivity : ComponentActivity() {
 
 
@@ -87,7 +102,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var database: WorkDatabase
     private lateinit var databaseDao: JobDao
     private var jobs: MutableState<List<Job>?> = mutableStateOf(arrayListOf())
+    private var mainActivityViewModel: MainActivityViewModel? = null
 
+    @ExperimentalMaterialApi
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -101,6 +118,11 @@ class MainActivity : ComponentActivity() {
 
         if (this::cameraExecutors.isInitialized.not()) {
             cameraExecutors = Executors.newSingleThreadExecutor()
+        }
+
+
+        if (mainActivityViewModel == null){
+            mainActivityViewModel = MainActivityViewModelFactory(this).create(MainActivityViewModel::class.java)
         }
 
         setContent {
@@ -146,25 +168,38 @@ class MainActivity : ComponentActivity() {
                     ),
                     scaffoldState = bottomSheetScaffoldState
                 ) {
+                    val _isLegacyMode = mainActivityViewModel?.isLegacyMode?.observeAsState()
+                    if(_isLegacyMode?.value?.not()!!){
+                       ContentCompact(
+                           textFromCamera = when (permissionGranted.value && cameraState.value) {
+                               true -> recognizeText()
+                               else -> null
+                           }, onSaveJob = saveJob(job), onClear = {
+                               job.value = Job()
+                           }, job = job.value
+                       )
+                    }else {
 
-                    if (cameraState.value && permissionGranted.value) {
-                        CameraView(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(150.dp)
+                        if (cameraState.value && permissionGranted.value) {
+                            CameraView(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(150.dp)
+                          )
+                            ZoomSliderHorizontal()
+                        } else if (permissionGranted.value.not()) {
+                            AboutDialog(title, permissionGranted)
+                        }
+
+                        Content(
+                            textFromCamera = when (permissionGranted.value && cameraState.value) {
+                                true -> recognizeText()
+                                else -> null
+                            }, onSaveJob = saveJob(job), onClear = {
+                                job.value = Job()
+                            }, job = job.value
                         )
-                    } else if (permissionGranted.value.not()) {
-                        AboutDialog(title, permissionGranted)
                     }
-
-                    Content(
-                        textFromCamera = when (permissionGranted.value && cameraState.value) {
-                            true -> recognizeText()
-                            else -> null
-                        }, onSaveJob = saveJob(job), onClear = {
-                            job.value = Job()
-                        }, job = job.value
-                    )
                 }
             }
         }
@@ -296,6 +331,7 @@ class MainActivity : ComponentActivity() {
 
         }
 
+    @ExperimentalMaterialApi
     @Composable
     private fun SheetContent(
         bottomSheetScaffoldState: BottomSheetScaffoldState,
@@ -348,6 +384,7 @@ class MainActivity : ComponentActivity() {
         }
 
 
+    @ExperimentalMaterialApi
     @Composable
     private fun RecentTopAppBar(
         bottomSheetScaffoldState: BottomSheetScaffoldState,
@@ -497,7 +534,9 @@ class MainActivity : ComponentActivity() {
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview
                     )
-                    camera?.cameraControl?.setLinearZoom(cameraZoom.value)
+                    if (mainActivityViewModel?.isLegacyMode?.value == true) {
+                        camera?.cameraControl?.setLinearZoom(cameraZoom.value)
+                    }
                 } catch (ex: Exception) {
                     hasInitCamera = false
                 }
@@ -522,6 +561,13 @@ class MainActivity : ComponentActivity() {
                     .inflate(R.layout.camera_not_initialized_error, null, false)
             }, modifier = modifier)
         }
+    }
+
+    @Composable
+    private fun ZoomSliderHorizontal() {
+        val cameraZoom = rememberSaveable {
+            mutableStateOf(pref?.getFloat(CAMERA_ZOOM_LEVEL, 0.5f) ?: 0.5f)
+        }
 
         Spacer(modifier = Modifier.height(2.dp))
 
@@ -541,6 +587,198 @@ class MainActivity : ComponentActivity() {
             }
 
         }
+    }
+
+    @Composable
+    fun ContentCompact(
+        textFromCamera: ((onTextResult: (value: Float?) -> Unit) -> Unit)?,
+        onSaveJob: ((job: Job) -> Unit)? = null, onClear: (() -> Unit), job: Job
+    ) {
+
+        val saveableJob by remember(key1 = job) {
+            mutableStateOf(job.copy())
+        }
+
+        val w1 = rememberSaveable(inputs = arrayOf(job)) {
+            mutableStateOf(job.w1.toString())
+        }
+        val w2 = rememberSaveable(inputs = arrayOf(job)) {
+            mutableStateOf(job.w2.toString())
+        }
+        val w3 = rememberSaveable(inputs = arrayOf(job)) {
+            mutableStateOf(job.w3.toString())
+        }
+
+        val modified = remember {
+            mutableStateOf(job != saveableJob)
+        }
+
+        val answer = rememberSaveable(inputs = arrayOf(w1.value, w2.value, w3.value, saveableJob.lastJobOperator)) {
+
+            saveableJob.w1 = w1.value.toFloat()
+            saveableJob.w2 = w2.value.toFloat()
+            saveableJob.w3 = w3.value.toFloat()
+
+            modified.value = saveableJob.sameAs(job).not()
+
+            return@rememberSaveable try {
+                mutableStateOf(saveableJob.calculate())
+            } catch (ex: ArithmeticException) {
+                mutableStateOf(0f)
+            }
+        }
+
+        ConstraintLayout {
+            val (cameraView, answerView, slider, contentView, snapBtn, saveBtn, clearBtn, jobOperatorBtn) = createRefs()
+
+            CameraView(modifier = Modifier
+                .fillMaxSize()
+                .constrainAs(cameraView) {
+                    top.linkTo(parent.top)
+                    bottom.linkTo(parent.bottom)
+                    start.linkTo(parent.start)
+                    end.linkTo(parent.end)
+                }
+            )
+
+            Text(text = buildAnnotatedString {
+                append("Answer: ${answer.value.toString()}  (${saveableJob.lastJobOperator.name})\n")
+                append("Current Job: " + if (job.uid == 0) "New (Unsaved)" else "ID - " + job.uid.toString() + if (modified.value) " (Modified)" else "")
+            } , modifier = Modifier
+                .constrainAs(answerView) {
+                    start.linkTo(parent.start)
+                    end.linkTo(parent.end)
+                    top.linkTo(parent.top)
+                }
+                .fillMaxWidth()
+                .background(Color.Black), textAlign = TextAlign.Center, color = Color.White)
+
+
+//                            Slider(value = 0.9f, onValueChange =  {
+//
+//                            }, modifier = Modifier.constrainAs(slider){
+//                                top.linkTo(parent.top)
+//                                bottom.linkTo(parent.bottom)
+//                            }.graphicsLayer {
+//                                rotationZ = -90f
+//                                translationX = -windowManager.currentWindowMetrics.bounds.toRectF().width() / 2
+//                            })
+
+            var selectedPosition by rememberSaveable {
+                if (w1.value.toFloat() == 0f) {
+                    mutableStateOf(1)
+                }else if (w1.value.toFloat() == 0f){
+                    mutableStateOf(2)
+                }else {
+                    mutableStateOf(3)
+                }
+            }
+
+            val jobAnalysisToggle = remember {
+                mutableStateOf(false)
+            }
+
+            Row(modifier = Modifier.constrainAs(contentView) {
+                top.linkTo(answerView.bottom, 8.dp)
+                start.linkTo(parent.start)
+                end.linkTo(parent.end)
+            }, horizontalArrangement = Arrangement.End) {
+                (1..3).forEach {
+                    TextButton(
+                        border = BorderStroke(1.dp, if (selectedPosition == it)  MaterialTheme.colors.primary else MaterialTheme.colors.secondaryVariant),
+                        colors = androidx.compose.material.ButtonDefaults.textButtonColors(backgroundColor = Color(0x00000021)),
+                        modifier = Modifier
+                            .padding(10.dp),
+                        onClick = {
+                            selectedPosition = it
+                        }) {
+                        Text(softWrap = false,
+                            maxLines = 2,
+                            text = buildAnnotatedString {
+                            pushStyle(style = SpanStyle(color = if (selectedPosition == it)  MaterialTheme.colors.primary else Color.White))
+                            pushStyle(style = ParagraphStyle(textAlign = TextAlign.Center))
+                            this.append("W$it\n")
+                            this.append(
+                                when(it){
+                                    1 -> w1;
+                                    2 -> w2;
+                                    else -> w3
+                                }.value
+                            )
+                        })
+                    }
+                }
+            }
+
+            IconButton(onClick = {
+                recognizeText().invoke {
+                    when(selectedPosition){
+                        1 -> w1.value = (it ?: 0.0f).toString();
+                        2 -> w2.value = (it ?: 0.0f).toString();
+                        else -> w3.value = (it ?: 0.0f).toString();
+                    }
+
+                    if (selectedPosition != 3)selectedPosition = selectedPosition.inc()
+                }
+            }, modifier = Modifier.constrainAs(snapBtn){
+                bottom.linkTo(parent.bottom, 75.dp)
+                start.linkTo(parent.start)
+                end.linkTo(parent.end)
+            }) {
+                Icon(painter = painterResource(id = R.drawable.ic_baseline_camera_24), contentDescription = "",
+                    tint = MaterialTheme.colors.secondaryVariant)
+            }
+
+            Button(onClick = {
+                onSaveJob?.invoke(saveableJob)
+            }, modifier = Modifier.constrainAs(saveBtn){
+                top.linkTo(snapBtn.top)
+                bottom.linkTo(snapBtn.bottom)
+                start.linkTo(snapBtn.end, 16.dp)
+            }) {
+                Text(text = "Save")
+            }
+
+            Button(onClick = {
+                onClear.invoke()
+            }, modifier = Modifier.constrainAs(clearBtn){
+                top.linkTo(snapBtn.top)
+                bottom.linkTo(snapBtn.bottom)
+                end.linkTo(snapBtn.start, 16.dp)
+            }) {
+                Text(text = "Clear")
+            }
+
+            IconButton(onClick = {
+                jobAnalysisToggle.value = jobAnalysisToggle.value.not()
+            },  modifier = Modifier.constrainAs(jobOperatorBtn){
+                top.linkTo(clearBtn.top)
+                bottom.linkTo(clearBtn.bottom)
+                start.linkTo(parent.start, 8.dp)
+            }) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_baseline_more_vert_24),
+                        contentDescription = "", tint = MaterialTheme.colors.primary)
+            }
+
+            DropdownMenu(
+                expanded = jobAnalysisToggle.value,
+                onDismissRequest = {
+                    jobAnalysisToggle.value = jobAnalysisToggle.value.not()
+                }) {
+                Job.JobOperator.values().forEach {
+                    DropdownMenuItem(onClick = {
+                        jobAnalysisToggle.value = jobAnalysisToggle.value.not()
+                        saveableJob.lastJobOperator = it
+                    }) {
+                        Text(text = it.name)
+                    }
+                }
+
+            }
+
+        }
+
     }
 
     @Composable
@@ -807,6 +1045,7 @@ class MainActivity : ComponentActivity() {
         val openMoreOverflow = remember {
             mutableStateOf(false)
         }
+        val _legacyModeState = mainActivityViewModel?.isLegacyMode?.observeAsState()
 
         TopAppBar(
             title = { Text(text = title) },
@@ -829,24 +1068,26 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    IconButton(onClick = {
-                        cameraState.value = cameraState.value.not()
-                        pref?.edit()?.putBoolean(CAMERA_PREFERRED_STATE, cameraState.value)
-                            ?.apply()
+                    if (_legacyModeState?.value == true) {
+                        IconButton(onClick = {
+                            cameraState.value = cameraState.value.not()
+                            pref?.edit()?.putBoolean(CAMERA_PREFERRED_STATE, cameraState.value)
+                                ?.apply()
 
-                        if (flashLightState.value && cameraState.value.not()) {
-                            flashLightState.value = flashLightState.value.not()
-                            camera?.cameraControl?.enableTorch(flashLightState.value)
+                            if (flashLightState.value && cameraState.value.not()) {
+                                flashLightState.value = flashLightState.value.not()
+                                camera?.cameraControl?.enableTorch(flashLightState.value)
+                            }
+                        }) {
+                            Icon(
+                                painter = painterResource(
+                                    id = when (cameraState.value) {
+                                        true -> R.drawable.ic_baseline_camera_off_24; else -> R.drawable.ic_baseline_camera_on_24
+                                    }
+                                ),
+                                contentDescription = ""
+                            )
                         }
-                    }) {
-                        Icon(
-                            painter = painterResource(
-                                id = when (cameraState.value) {
-                                    true -> R.drawable.ic_baseline_camera_off_24; else -> R.drawable.ic_baseline_camera_on_24
-                                }
-                            ),
-                            contentDescription = ""
-                        )
                     }
 
                 }
@@ -861,6 +1102,25 @@ class MainActivity : ComponentActivity() {
 
                 DropdownMenu(expanded = openMoreOverflow.value,
                     onDismissRequest = { openMoreOverflow.value = openMoreOverflow.value.not() }) {
+                    DropdownMenuItem(onClick = {
+                        openMoreOverflow.value = openMoreOverflow.value.not()
+                    }) {
+                        Row(Modifier.clickable {
+                            mainActivityViewModel?.setLegacyMode(_legacyModeState?.value?.not()!!)
+                        }.padding(vertical = 4.dp)) {
+                            Text(
+                                text = "Legacy Mode", modifier = Modifier
+                                    .padding(end = 6.dp),
+                                color = MaterialTheme.colors.secondaryVariant
+                            )
+
+                            Checkbox(checked = _legacyModeState?.value!!, onCheckedChange = {
+                                mainActivityViewModel?.setLegacyMode(_legacyModeState.value?.not()!!)
+                            })
+
+                        }
+                    }
+
                     DropdownMenuItem(onClick = {
                         openDialog.value = true; openMoreOverflow.value =
                         openMoreOverflow.value.not()
