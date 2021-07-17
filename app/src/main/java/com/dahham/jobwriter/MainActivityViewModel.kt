@@ -64,12 +64,10 @@ class MainActivityViewModel(val sharedPreferences: SharedPreferences): ViewModel
         return id
     }
 
-    suspend fun deleteJobs(){
+    suspend fun deleteJobs(jobs: List<Job>){
         withContext(Dispatchers.IO) {
             databaseDao.Delete(
-                job = databaseDao.getAll().value?.toTypedArray()
-                    ?: return@withContext
-            )
+                *jobs.toTypedArray())
         }
     }
 }

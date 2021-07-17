@@ -81,7 +81,6 @@ class MainActivity : ComponentActivity(), MainActivityUtils {
     private lateinit var cameraExecutors: ExecutorService
     private var camera: Camera? = null
     private var pref: SharedPreferences? = null
-    private var jobs: LiveData<List<Job>>? = null
     private var mainActivityViewModel: MainActivityViewModel? = null
 
     @ExperimentalMaterialApi
@@ -100,10 +99,6 @@ class MainActivity : ComponentActivity(), MainActivityUtils {
 
         if (mainActivityViewModel == null){
             mainActivityViewModel = MainActivityViewModelFactory(this).create(MainActivityViewModel::class.java)
-            lifecycleScope.launch {
-                jobs = mainActivityViewModel?.initializeDatabase(applicationContext)
-            }
-
         }
 
         setContent {
@@ -126,6 +121,18 @@ class MainActivity : ComponentActivity(), MainActivityUtils {
                 mutableStateOf(Job())
             }
 
+            var jobs by remember{
+                mutableStateOf(listOf<Job>())
+            }
+
+            val scope = rememberCoroutineScope()
+
+            scope.launch {
+                mainActivityViewModel?.initializeDatabase(applicationContext)?.observe(this@MainActivity){
+                    jobs = it
+                }
+            }
+
             val cameraState = rememberSaveable {
                 mutableStateOf(pref?.getBoolean(CAMERA_PREFERRED_STATE, true) ?: true)
             }
@@ -141,7 +148,7 @@ class MainActivity : ComponentActivity(), MainActivityUtils {
                     sheetContent = SheetContent(
                         bottomSheetScaffoldState,
                         bStateTitle,
-                        job
+                        job, jobs
                     ),
                     topBar = AppTopAppBar(
                         title = title.toString(), permissionGranted.value,
@@ -318,7 +325,8 @@ class MainActivity : ComponentActivity(), MainActivityUtils {
     private fun SheetContent(
         bottomSheetScaffoldState: BottomSheetScaffoldState,
         bStateTitle: String,
-        job: MutableState<Job>
+        job: MutableState<Job>,
+        jobs: List<Job>
     ): @Composable (ColumnScope.() -> Unit) =
         {
             val scope = rememberCoroutineScope()
@@ -335,7 +343,7 @@ class MainActivity : ComponentActivity(), MainActivityUtils {
                             }.setPositiveButton("Yes") { dialog, index ->
                                 dialog.dismiss()
                                 scope.launch {
-                                    mainActivityViewModel?.deleteJobs()
+                                    mainActivityViewModel?.deleteJobs(jobs)
                                 }
                             }.show()
                     }) {
@@ -350,7 +358,7 @@ class MainActivity : ComponentActivity(), MainActivityUtils {
                 scaffoldState = innerScaffoldState
             ) {
 
-                RecentJobsView(it, jobs?.value) {
+                RecentJobsView(it, jobs) {
                     scope.launch {
                         bottomSheetScaffoldState.bottomSheetState.collapse()
                     }
@@ -529,9 +537,12 @@ class MainActivity : ComponentActivity(), MainActivityUtils {
                     DropdownMenuItem(onClick = {
                         openMoreOverflow.value = openMoreOverflow.value.not()
                     }) {
-                        Row(Modifier.clickable {
-                            mainActivityViewModel?.setLegacyMode(_legacyModeState?.value?.not()!!)
-                        }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            Modifier
+                                .clickable {
+                                    mainActivityViewModel?.setLegacyMode(_legacyModeState?.value?.not()!!)
+                                }
+                                .padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = "Legacy Mode", modifier = Modifier
                                     .padding(end = 6.dp),

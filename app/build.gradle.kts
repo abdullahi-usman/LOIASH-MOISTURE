@@ -13,8 +13,8 @@ android {
         applicationId = "com.dahham.jobwriter"
         minSdk = 21
         targetSdk = 30
-        versionCode = 170
-        versionName = "1.7.0"
+        versionCode = 201
+        versionName = "2.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
